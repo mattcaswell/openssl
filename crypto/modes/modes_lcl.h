@@ -136,3 +136,26 @@ struct ccm128_context {
 	void *key;
 };
 
+struct ocb128_context {
+	/* Need both encrypt and decrypt key schedules for decryption */
+	block128_f encrypt;
+	block128_f decrypt;
+	void *keyenc;
+	void *keydec;
+
+	/* Key dependent variables. Can be reused if key remains the same */
+	size_t l_index;
+	unsigned char l_star[16];
+	unsigned char l_dollar[16];
+	unsigned char l[1008];
+
+	/* Must be reset for each session */
+	u64 blocks_hashed;
+	u64 blocks_processed;
+	unsigned char tag[16];
+	unsigned char offset_aad[16];
+	unsigned char sum[16];
+	unsigned char offset[16];
+	unsigned char checksum[16];
+
+};
