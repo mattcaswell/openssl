@@ -156,6 +156,7 @@ typedef struct ocb128_context OCB128_CONTEXT;
 
 OCB128_CONTEXT *CRYPTO_ocb128_new(void *keyenc, void *keydec, block128_f encrypt, block128_f decrypt);
 void CRYPTO_ocb128_init(OCB128_CONTEXT *ctx,void *keyenc, void *keydec,block128_f encrypt,block128_f decrypt);
+void CRYPTO_ocb128_set_ks(OCB128_CONTEXT *ctx, void *keyenc, void *keydec);
 int CRYPTO_ocb128_setiv(OCB128_CONTEXT *ctx, const unsigned char *iv,
 			size_t len, size_t taglen);
 void CRYPTO_ocb128_aad(OCB128_CONTEXT *ctx, const unsigned char *aad,

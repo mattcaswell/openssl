@@ -2362,6 +2362,9 @@ const EVP_CIPHER *EVP_aes_256_wrap_pad(void)
 static int aes_ocb_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
 	{
 	EVP_AES_OCB_CTX *octx = c->cipher_data;
+	EVP_CIPHER_CTX *newc;
+	EVP_AES_OCB_CTX *new_octx;
+
 	switch (type)
 		{
 	case EVP_CTRL_INIT:
@@ -2401,6 +2404,13 @@ static int aes_ocb_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
 			return 0;
 
 		memcpy(ptr, octx->tag, arg);
+		return 1;
+
+	case EVP_CTRL_COPY:
+		newc = (EVP_CIPHER_CTX *)ptr;
+		new_octx = newc->cipher_data;
+		CRYPTO_ocb128_set_ks(&new_octx->ocb, &new_octx->ksenc,
+			&new_octx->ksdec);
 		return 1;
 
 	default:

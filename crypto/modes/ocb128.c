@@ -188,6 +188,12 @@ void CRYPTO_ocb128_init(OCB128_CONTEXT *ctx,void *keyenc, void *keydec,
 	ctx->l_index = 0;
 }
 
+void CRYPTO_ocb128_set_ks(OCB128_CONTEXT *ctx, void *keyenc, void *keydec)
+{
+	ctx->keyenc = keyenc;
+	ctx->keydec = keydec;
+}
+
 /* Set the IV to be used for this operation. Must be 1 - 15 bytes.
  */
 int CRYPTO_ocb128_setiv(OCB128_CONTEXT *ctx, const unsigned char *iv,
