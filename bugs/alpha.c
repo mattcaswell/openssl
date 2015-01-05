@@ -56,36 +56,36 @@
  * [including the GNU Public Licence.]
  */
 
-/* while not exactly a bug (ASN1 C leaves this undefined) it is
- * something to watch out for.  This was fine on linux/NT/Solaris but not
- * Alpha */
+/*
+ * while not exactly a bug (ASN1 C leaves this undefined) it is something to
+ * watch out for.  This was fine on linux/NT/Solaris but not Alpha 
+ */
 
-/* it is basically an example of
- * func(*(a++),*(a++))
- * which parameter is evaluated first?  It is not defined in ASN1 C.
+/*
+ * it is basically an example of func(*(a++),*(a++)) which parameter is
+ * evaluated first? It is not defined in ASN1 C. 
  */
 
 #include <stdio.h>
 
 #define TYPE    unsigned int
 
-void func(a,b)
+void func(a, b)
 TYPE *a;
 TYPE b;
-        {
-        printf("%ld -1 == %ld\n",a[0],b);
-        }
+{
+    printf("%ld -1 == %ld\n", a[0], b);
+}
 
 main()
-        {
-        TYPE data[5]={1L,2L,3L,4L,5L};
-        TYPE *p;
-        int i;
+{
+    TYPE data[5] = { 1L, 2L, 3L, 4L, 5L };
+    TYPE *p;
+    int i;
 
-        p=data;
+    p = data;
 
-        for (i=0; i<4; i++)
-                {
-                func(p,*(p++));
-                }
-        }
+    for (i = 0; i < 4; i++) {
+        func(p, *(p++));
+    }
+}

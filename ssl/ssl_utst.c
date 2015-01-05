@@ -1,6 +1,7 @@
 /* ssl_utst.c */
-/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
- * project.
+/*
+ * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
+ * project. 
  */
 /* ====================================================================
  * Copyright (c) 2014 The OpenSSL Project.  All rights reserved.
@@ -56,18 +57,16 @@
 
 #ifndef OPENSSL_NO_UNIT_TEST
 
-
-static const struct openssl_ssl_test_functions ssl_test_functions =
-	{
-	ssl_init_wbio_buffer,
-	ssl3_setup_buffers,
-	tls1_process_heartbeat,
-	dtls1_process_heartbeat
-	};
+static const struct openssl_ssl_test_functions ssl_test_functions = {
+    ssl_init_wbio_buffer,
+    ssl3_setup_buffers,
+    tls1_process_heartbeat,
+    dtls1_process_heartbeat
+};
 
 const struct openssl_ssl_test_functions *SSL_test_functions(void)
-	{
-	return &ssl_test_functions;
-	}
+{
+    return &ssl_test_functions;
+}
 
 #endif
