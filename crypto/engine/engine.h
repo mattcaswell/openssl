@@ -131,9 +131,9 @@ extern "C" {
 # define ENGINE_TABLE_FLAG_NOINIT        (unsigned int)0x0001
 
 /* ENGINE flags that can be set by ENGINE_set_flags(). */
-                                                                                                   /*- #define ENGINE_FLAGS_MALLOCED       0x0001 *//*
-                                                                                                    * Not used 
-                                                                                                    */
+/*- #define ENGINE_FLAGS_MALLOCED       0x0001 *//*
+ * Not used 
+ */
 
 /*
  * This flag is for ENGINEs that wish to handle the various 'CMD'-related

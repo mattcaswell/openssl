@@ -77,9 +77,9 @@
 # endif
 #endif
 
-                                                 /*- #define SIGACTION *//*
-                                                  * Define this if you have sigaction() 
-                                                  */
+/*- #define SIGACTION *//*
+ * Define this if you have sigaction() 
+ */
 
 /* 06-Apr-92 Luke Brennan    Support for VMS */
 #include "des_locl.h"
