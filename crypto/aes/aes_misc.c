@@ -53,12 +53,13 @@
 #include <openssl/aes.h>
 #include "aes_locl.h"
 
-const char AES_version[]="AES" OPENSSL_VERSION_PTEXT;
+const char AES_version[] = "AES" OPENSSL_VERSION_PTEXT;
 
-const char *AES_options(void) {
+const char *AES_options(void)
+{
 #ifdef FULL_UNROLL
-        return "aes(full)";
-#else   
-        return "aes(partial)";
+    return "aes(full)";
+#else
+    return "aes(partial)";
 #endif
 }

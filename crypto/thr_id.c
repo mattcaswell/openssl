@@ -117,134 +117,131 @@
 #include "cryptlib.h"
 
 #ifndef OPENSSL_NO_DEPRECATED
-static unsigned long (*id_callback)(void)=0;
+static unsigned long (*id_callback) (void) = 0;
 #endif
-static void (*threadid_callback)(CRYPTO_THREADID *)=0;
+static void (*threadid_callback) (CRYPTO_THREADID *) = 0;
 
-/* the memset() here and in set_pointer() seem overkill, but for the sake of
- * CRYPTO_THREADID_cmp() this avoids any platform silliness that might cause two
- * "equal" THREADID structs to not be memcmp()-identical. */
+/*
+ * the memset() here and in set_pointer() seem overkill, but for the sake of
+ * CRYPTO_THREADID_cmp() this avoids any platform silliness that might cause
+ * two "equal" THREADID structs to not be memcmp()-identical. 
+ */
 void CRYPTO_THREADID_set_numeric(CRYPTO_THREADID *id, unsigned long val)
-	{
-	memset(id, 0, sizeof(*id));
-	id->val = val;
-	}
+{
+    memset(id, 0, sizeof(*id));
+    id->val = val;
+}
 
 static const unsigned char hash_coeffs[] = { 3, 5, 7, 11, 13, 17, 19, 23 };
+
 void CRYPTO_THREADID_set_pointer(CRYPTO_THREADID *id, void *ptr)
-	{
-	unsigned char *dest = (void *)&id->val;
-	unsigned int accum = 0;
-	unsigned char dnum = sizeof(id->val);
+{
+    unsigned char *dest = (void *)&id->val;
+    unsigned int accum = 0;
+    unsigned char dnum = sizeof(id->val);
 
-	memset(id, 0, sizeof(*id));
-	id->ptr = ptr;
-	if (sizeof(id->val) >= sizeof(id->ptr))
-		{
-		/* 'ptr' can be embedded in 'val' without loss of uniqueness */
-		id->val = (unsigned long)id->ptr;
-		return;
-		}
-	/* hash ptr ==> val. Each byte of 'val' gets the mod-256 total of a
-	 * linear function over the bytes in 'ptr', the co-efficients of which
-	 * are a sequence of low-primes (hash_coeffs is an 8-element cycle) -
-	 * the starting prime for the sequence varies for each byte of 'val'
-	 * (unique polynomials unless pointers are >64-bit). For added spice,
-	 * the totals accumulate rather than restarting from zero, and the index
-	 * of the 'val' byte is added each time (position dependence). If I was
-	 * a black-belt, I'd scan big-endian pointers in reverse to give
-	 * low-order bits more play, but this isn't crypto and I'd prefer nobody
-	 * mistake it as such. Plus I'm lazy. */
-	while (dnum--)
-		{
-		const unsigned char *src = (void *)&id->ptr;
-		unsigned char snum = sizeof(id->ptr);
-		while (snum--)
-			accum += *(src++) * hash_coeffs[(snum + dnum) & 7];
-		accum += dnum;
-		*(dest++) = accum & 255;
-		}
-	}
+    memset(id, 0, sizeof(*id));
+    id->ptr = ptr;
+    if (sizeof(id->val) >= sizeof(id->ptr)) {
+        /* 'ptr' can be embedded in 'val' without loss of uniqueness */
+        id->val = (unsigned long)id->ptr;
+        return;
+    }
+    /*
+     * hash ptr ==> val. Each byte of 'val' gets the mod-256 total of a
+     * linear function over the bytes in 'ptr', the co-efficients of which
+     * are a sequence of low-primes (hash_coeffs is an 8-element cycle) - the 
+     * starting prime for the sequence varies for each byte of 'val' (unique
+     * polynomials unless pointers are >64-bit). For added spice, the totals
+     * accumulate rather than restarting from zero, and the index of the
+     * 'val' byte is added each time (position dependence). If I was a
+     * black-belt, I'd scan big-endian pointers in reverse to give low-order
+     * bits more play, but this isn't crypto and I'd prefer nobody mistake it 
+     * as such. Plus I'm lazy. 
+     */
+    while (dnum--) {
+        const unsigned char *src = (void *)&id->ptr;
+        unsigned char snum = sizeof(id->ptr);
+        while (snum--)
+            accum += *(src++) * hash_coeffs[(snum + dnum) & 7];
+        accum += dnum;
+        *(dest++) = accum & 255;
+    }
+}
 
-int CRYPTO_THREADID_set_callback(void (*func)(CRYPTO_THREADID *))
-	{
-	if (threadid_callback)
-		return 0;
-	threadid_callback = func;
-	return 1;
-	}
+int CRYPTO_THREADID_set_callback(void (*func) (CRYPTO_THREADID *))
+{
+    if (threadid_callback)
+        return 0;
+    threadid_callback = func;
+    return 1;
+}
 
-void (*CRYPTO_THREADID_get_callback(void))(CRYPTO_THREADID *)
-	{
-	return threadid_callback;
-	}
+void (*CRYPTO_THREADID_get_callback(void)) (CRYPTO_THREADID *) {
+    return threadid_callback;
+}
 
 void CRYPTO_THREADID_current(CRYPTO_THREADID *id)
-	{
-	if (threadid_callback)
-		{
-		threadid_callback(id);
-		return;
-		}
+{
+    if (threadid_callback) {
+        threadid_callback(id);
+        return;
+    }
 #ifndef OPENSSL_NO_DEPRECATED
-	/* If the deprecated callback was set, fall back to that */
-	if (id_callback)
-		{
-		CRYPTO_THREADID_set_numeric(id, id_callback());
-		return;
-		}
+    /* If the deprecated callback was set, fall back to that */
+    if (id_callback) {
+        CRYPTO_THREADID_set_numeric(id, id_callback());
+        return;
+    }
 #endif
-	/* Else pick a backup */
+    /* Else pick a backup */
 #if defined(OPENSSL_SYS_WIN32)
-	CRYPTO_THREADID_set_numeric(id, (unsigned long)GetCurrentThreadId());
+    CRYPTO_THREADID_set_numeric(id, (unsigned long)GetCurrentThreadId());
 #else
-	/* For everything else, default to using the address of 'errno' */
-	CRYPTO_THREADID_set_pointer(id, (void*)&errno);
+    /* For everything else, default to using the address of 'errno' */
+    CRYPTO_THREADID_set_pointer(id, (void *)&errno);
 #endif
-	}
+}
 
 int CRYPTO_THREADID_cmp(const CRYPTO_THREADID *a, const CRYPTO_THREADID *b)
-	{
-	return memcmp(a, b, sizeof(*a));
-	}
+{
+    return memcmp(a, b, sizeof(*a));
+}
 
 void CRYPTO_THREADID_cpy(CRYPTO_THREADID *dest, const CRYPTO_THREADID *src)
-	{
-	memcpy(dest, src, sizeof(*src));
-	}
+{
+    memcpy(dest, src, sizeof(*src));
+}
 
 unsigned long CRYPTO_THREADID_hash(const CRYPTO_THREADID *id)
-	{
-	return id->val;
-	}
+{
+    return id->val;
+}
 
 #ifndef OPENSSL_NO_DEPRECATED
-unsigned long (*CRYPTO_get_id_callback(void))(void)
-	{
-	return(id_callback);
-	}
+unsigned long (*CRYPTO_get_id_callback(void)) (void) {
+    return (id_callback);
+}
 
-void CRYPTO_set_id_callback(unsigned long (*func)(void))
-	{
-	id_callback=func;
-	}
+void CRYPTO_set_id_callback(unsigned long (*func) (void))
+{
+    id_callback = func;
+}
 
 unsigned long CRYPTO_thread_id(void)
-	{
-	unsigned long ret=0;
+{
+    unsigned long ret = 0;
 
-	if (id_callback == NULL)
-		{
-#if defined(OPENSSL_SYS_WIN32)
-		ret=(unsigned long)GetCurrentThreadId();
-#elif defined(GETPID_IS_MEANINGLESS)
-		ret=1L;
-#else
-		ret=(unsigned long)getpid();
-#endif
-		}
-	else
-		ret=id_callback();
-	return(ret);
-	}
+    if (id_callback == NULL) {
+# if defined(OPENSSL_SYS_WIN32)
+        ret = (unsigned long)GetCurrentThreadId();
+# elif defined(GETPID_IS_MEANINGLESS)
+        ret = 1L;
+# else
+        ret = (unsigned long)getpid();
+# endif
+    } else
+        ret = id_callback();
+    return (ret);
+}
 #endif

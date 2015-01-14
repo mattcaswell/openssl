@@ -36,21 +36,21 @@
 #include "ec_lcl.h"
 
 #if BN_BITS2 != 64
-# define TOBN(hi,lo)	lo,hi
+# define TOBN(hi,lo)    lo,hi
 #else
-# define TOBN(hi,lo)	((BN_ULONG)hi<<32|lo)
+# define TOBN(hi,lo)    ((BN_ULONG)hi<<32|lo)
 #endif
 
 #if defined(__GNUC__)
-# define ALIGN32	__attribute((aligned(32)))
+# define ALIGN32        __attribute((aligned(32)))
 #elif defined(_MSC_VER)
-# define ALIGN32	__declspec(align(32))
+# define ALIGN32        __declspec(align(32))
 #else
 # define ALIGN32
 #endif
 
-#define ALIGNPTR(p,N)	((unsigned char *)p+N-(size_t)p%N)
-#define P256_LIMBS	(256/BN_BITS2)
+#define ALIGNPTR(p,N)   ((unsigned char *)p+N-(size_t)p%N)
+#define P256_LIMBS      (256/BN_BITS2)
 
 typedef unsigned short u16;
 
@@ -71,9 +71,11 @@ typedef P256_POINT_AFFINE PRECOMP256_ROW[64];
 typedef struct ec_pre_comp_st {
     const EC_GROUP *group;      /* Parent EC_GROUP object */
     size_t w;                   /* Window size */
-    /* Constant time access to the X and Y coordinates of the pre-computed,
+    /*
+     * Constant time access to the X and Y coordinates of the pre-computed,
      * generator multiplies, in the Montgomery domain. Pre-calculated
-     * multiplies are stored in affine form. */
+     * multiplies are stored in affine form. 
+     */
     PRECOMP256_ROW *precomp;
     void *precomp_storage;
     int references;
@@ -89,15 +91,15 @@ void ecp_nistz256_div_by_2(BN_ULONG res[P256_LIMBS],
 /* Modular mul by 3: res = 3*a mod P */
 void ecp_nistz256_mul_by_3(BN_ULONG res[P256_LIMBS],
                            const BN_ULONG a[P256_LIMBS]);
-/* Modular add: res = a+b mod P	  */
+/* Modular add: res = a+b mod P          */
 void ecp_nistz256_add(BN_ULONG res[P256_LIMBS],
                       const BN_ULONG a[P256_LIMBS],
                       const BN_ULONG b[P256_LIMBS]);
-/* Modular sub: res = a-b mod P	  */
+/* Modular sub: res = a-b mod P          */
 void ecp_nistz256_sub(BN_ULONG res[P256_LIMBS],
                       const BN_ULONG a[P256_LIMBS],
                       const BN_ULONG b[P256_LIMBS]);
-/* Modular neg: res = -a mod P	  */
+/* Modular neg: res = -a mod P   */
 void ecp_nistz256_neg(BN_ULONG res[P256_LIMBS], const BN_ULONG a[P256_LIMBS]);
 /* Montgomery mul: res = a*b*2^-256 mod P */
 void ecp_nistz256_mul_mont(BN_ULONG res[P256_LIMBS],
@@ -113,14 +115,14 @@ void ecp_nistz256_from_mont(BN_ULONG res[P256_LIMBS],
 void ecp_nistz256_to_mont(BN_ULONG res[P256_LIMBS],
                           const BN_ULONG in[P256_LIMBS]);
 /* Functions that perform constant time access to the precomputed tables */
-void ecp_nistz256_scatter_w5(P256_POINT * val,
-                            const P256_POINT * in_t, int index);
-void ecp_nistz256_gather_w5(P256_POINT * val,
-                            const P256_POINT * in_t, int index);
-void ecp_nistz256_scatter_w7(P256_POINT_AFFINE * val,
-                            const P256_POINT_AFFINE * in_t, int index);
-void ecp_nistz256_gather_w7(P256_POINT_AFFINE * val,
-                            const P256_POINT_AFFINE * in_t, int index);
+void ecp_nistz256_scatter_w5(P256_POINT *val,
+                             const P256_POINT *in_t, int index);
+void ecp_nistz256_gather_w5(P256_POINT *val,
+                            const P256_POINT *in_t, int index);
+void ecp_nistz256_scatter_w7(P256_POINT_AFFINE *val,
+                             const P256_POINT_AFFINE *in_t, int index);
+void ecp_nistz256_gather_w7(P256_POINT_AFFINE *val,
+                            const P256_POINT_AFFINE *in_t, int index);
 
 /* One converted into the Montgomery domain */
 static const BN_ULONG ONE[P256_LIMBS] = {
@@ -131,7 +133,7 @@ static const BN_ULONG ONE[P256_LIMBS] = {
 static void *ecp_nistz256_pre_comp_dup(void *);
 static void ecp_nistz256_pre_comp_free(void *);
 static void ecp_nistz256_pre_comp_clear_free(void *);
-static EC_PRE_COMP *ecp_nistz256_pre_comp_new(const EC_GROUP * group);
+static EC_PRE_COMP *ecp_nistz256_pre_comp_new(const EC_GROUP *group);
 
 /* Precomputed tables for the default generator */
 extern const PRECOMP256_ROW ecp_nistz256_precomputed[37];
@@ -225,15 +227,15 @@ static BN_ULONG is_one(const BN_ULONG a[P256_LIMBS])
 }
 
 #ifndef ECP_NISTZ256_REFERENCE_IMPLEMENTATION
-void ecp_nistz256_point_double(P256_POINT * r, const P256_POINT * a);
-void ecp_nistz256_point_add(P256_POINT * r,
-                            const P256_POINT * a, const P256_POINT * b);
-void ecp_nistz256_point_add_affine(P256_POINT * r,
-                                   const P256_POINT * a,
-                                   const P256_POINT_AFFINE * b);
+void ecp_nistz256_point_double(P256_POINT *r, const P256_POINT *a);
+void ecp_nistz256_point_add(P256_POINT *r,
+                            const P256_POINT *a, const P256_POINT *b);
+void ecp_nistz256_point_add_affine(P256_POINT *r,
+                                   const P256_POINT *a,
+                                   const P256_POINT_AFFINE *b);
 #else
 /* Point double: r = 2*a */
-static void ecp_nistz256_point_double(P256_POINT * r, const P256_POINT * a)
+static void ecp_nistz256_point_double(P256_POINT *r, const P256_POINT *a)
 {
     BN_ULONG S[P256_LIMBS];
     BN_ULONG M[P256_LIMBS];
@@ -279,8 +281,8 @@ static void ecp_nistz256_point_double(P256_POINT * r, const P256_POINT * a)
 }
 
 /* Point addition: r = a+b */
-static void ecp_nistz256_point_add(P256_POINT * r,
-                                   const P256_POINT * a, const P256_POINT * b)
+static void ecp_nistz256_point_add(P256_POINT *r,
+                                   const P256_POINT *a, const P256_POINT *b)
 {
     BN_ULONG U2[P256_LIMBS], S2[P256_LIMBS];
     BN_ULONG U1[P256_LIMBS], S1[P256_LIMBS];
@@ -305,39 +307,41 @@ static void ecp_nistz256_point_add(P256_POINT * r,
     const BN_ULONG *in2_y = b->Y;
     const BN_ULONG *in2_z = b->Z;
 
-    /* We encode infinity as (0,0), which is not on the curve,
-     * so it is OK. */
+    /*
+     * We encode infinity as (0,0), which is not on the curve, so it is OK. 
+     */
     in1infty = in1_x[0] | in1_x[1] | in1_x[2] | in1_x[3] |
-               in1_y[0] | in1_y[1] | in1_y[2] | in1_y[3];
+        in1_y[0] | in1_y[1] | in1_y[2] | in1_y[3];
     if (P256_LIMBS == 8)
         in1infty |= in1_x[4] | in1_x[5] | in1_x[6] | in1_x[7] |
-                    in1_y[4] | in1_y[5] | in1_y[6] | in1_y[7];
+            in1_y[4] | in1_y[5] | in1_y[6] | in1_y[7];
 
     in2infty = in2_x[0] | in2_x[1] | in2_x[2] | in2_x[3] |
-               in2_y[0] | in2_y[1] | in2_y[2] | in2_y[3];
+        in2_y[0] | in2_y[1] | in2_y[2] | in2_y[3];
     if (P256_LIMBS == 8)
         in2infty |= in2_x[4] | in2_x[5] | in2_x[6] | in2_x[7] |
-                    in2_y[4] | in2_y[5] | in2_y[6] | in2_y[7];
+            in2_y[4] | in2_y[5] | in2_y[6] | in2_y[7];
 
     in1infty = is_zero(in1infty);
     in2infty = is_zero(in2infty);
 
-    ecp_nistz256_sqr_mont(Z2sqr, in2_z);        /* Z2^2 */
-    ecp_nistz256_sqr_mont(Z1sqr, in1_z);        /* Z1^2 */
+    ecp_nistz256_sqr_mont(Z2sqr, in2_z); /* Z2^2 */
+    ecp_nistz256_sqr_mont(Z1sqr, in1_z); /* Z1^2 */
 
-    ecp_nistz256_mul_mont(S1, Z2sqr, in2_z);    /* S1 = Z2^3 */
-    ecp_nistz256_mul_mont(S2, Z1sqr, in1_z);    /* S2 = Z1^3 */
+    ecp_nistz256_mul_mont(S1, Z2sqr, in2_z); /* S1 = Z2^3 */
+    ecp_nistz256_mul_mont(S2, Z1sqr, in1_z); /* S2 = Z1^3 */
 
-    ecp_nistz256_mul_mont(S1, S1, in1_y);       /* S1 = Y1*Z2^3 */
-    ecp_nistz256_mul_mont(S2, S2, in2_y);       /* S2 = Y2*Z1^3 */
-    ecp_nistz256_sub(R, S2, S1);                /* R = S2 - S1 */
+    ecp_nistz256_mul_mont(S1, S1, in1_y); /* S1 = Y1*Z2^3 */
+    ecp_nistz256_mul_mont(S2, S2, in2_y); /* S2 = Y2*Z1^3 */
+    ecp_nistz256_sub(R, S2, S1); /* R = S2 - S1 */
 
-    ecp_nistz256_mul_mont(U1, in1_x, Z2sqr);    /* U1 = X1*Z2^2 */
-    ecp_nistz256_mul_mont(U2, in2_x, Z1sqr);    /* U2 = X2*Z1^2 */
-    ecp_nistz256_sub(H, U2, U1);                /* H = U2 - U1 */
+    ecp_nistz256_mul_mont(U1, in1_x, Z2sqr); /* U1 = X1*Z2^2 */
+    ecp_nistz256_mul_mont(U2, in2_x, Z1sqr); /* U2 = X2*Z1^2 */
+    ecp_nistz256_sub(H, U2, U1); /* H = U2 - U1 */
 
-    /* This should not happen during sign/ecdh,
-     * so no constant time violation */
+    /*
+     * This should not happen during sign/ecdh, so no constant time violation 
+     */
     if (is_equal(U1, U2) && !in1infty && !in2infty) {
         if (is_equal(S1, S2)) {
             ecp_nistz256_point_double(r, a);
@@ -348,14 +352,14 @@ static void ecp_nistz256_point_add(P256_POINT * r,
         }
     }
 
-    ecp_nistz256_sqr_mont(Rsqr, R);             /* R^2 */
-    ecp_nistz256_mul_mont(res_z, H, in1_z);     /* Z3 = H*Z1*Z2 */
-    ecp_nistz256_sqr_mont(Hsqr, H);             /* H^2 */
+    ecp_nistz256_sqr_mont(Rsqr, R); /* R^2 */
+    ecp_nistz256_mul_mont(res_z, H, in1_z); /* Z3 = H*Z1*Z2 */
+    ecp_nistz256_sqr_mont(Hsqr, H); /* H^2 */
     ecp_nistz256_mul_mont(res_z, res_z, in2_z); /* Z3 = H*Z1*Z2 */
-    ecp_nistz256_mul_mont(Hcub, Hsqr, H);       /* H^3 */
+    ecp_nistz256_mul_mont(Hcub, Hsqr, H); /* H^3 */
 
-    ecp_nistz256_mul_mont(U2, U1, Hsqr);        /* U1*H^2 */
-    ecp_nistz256_mul_by_2(Hsqr, U2);            /* 2*U1*H^2 */
+    ecp_nistz256_mul_mont(U2, U1, Hsqr); /* U1*H^2 */
+    ecp_nistz256_mul_by_2(Hsqr, U2); /* 2*U1*H^2 */
 
     ecp_nistz256_sub(res_x, Rsqr, Hsqr);
     ecp_nistz256_sub(res_x, res_x, Hcub);
@@ -380,9 +384,9 @@ static void ecp_nistz256_point_add(P256_POINT * r,
 }
 
 /* Point addition when b is known to be affine: r = a+b */
-static void ecp_nistz256_point_add_affine(P256_POINT * r,
-                                          const P256_POINT * a,
-                                          const P256_POINT_AFFINE * b)
+static void ecp_nistz256_point_add_affine(P256_POINT *r,
+                                          const P256_POINT *a,
+                                          const P256_POINT_AFFINE *b)
 {
     BN_ULONG U2[P256_LIMBS], S2[P256_LIMBS];
     BN_ULONG Z1sqr[P256_LIMBS];
@@ -404,41 +408,43 @@ static void ecp_nistz256_point_add_affine(P256_POINT * r,
     const BN_ULONG *in2_x = b->X;
     const BN_ULONG *in2_y = b->Y;
 
-    /* In affine representation we encode infty as (0,0),
-     * which is not on the curve, so it is OK */
+    /*
+     * In affine representation we encode infty as (0,0), which is not on the 
+     * curve, so it is OK 
+     */
     in1infty = in1_x[0] | in1_x[1] | in1_x[2] | in1_x[3] |
-               in1_y[0] | in1_y[1] | in1_y[2] | in1_y[3];
+        in1_y[0] | in1_y[1] | in1_y[2] | in1_y[3];
     if (P256_LIMBS == 8)
         in1infty |= in1_x[4] | in1_x[5] | in1_x[6] | in1_x[7] |
-                    in1_y[4] | in1_y[5] | in1_y[6] | in1_y[7];
+            in1_y[4] | in1_y[5] | in1_y[6] | in1_y[7];
 
     in2infty = in2_x[0] | in2_x[1] | in2_x[2] | in2_x[3] |
-               in2_y[0] | in2_y[1] | in2_y[2] | in2_y[3];
+        in2_y[0] | in2_y[1] | in2_y[2] | in2_y[3];
     if (P256_LIMBS == 8)
         in2infty |= in2_x[4] | in2_x[5] | in2_x[6] | in2_x[7] |
-                    in2_y[4] | in2_y[5] | in2_y[6] | in2_y[7];
+            in2_y[4] | in2_y[5] | in2_y[6] | in2_y[7];
 
     in1infty = is_zero(in1infty);
     in2infty = is_zero(in2infty);
 
-    ecp_nistz256_sqr_mont(Z1sqr, in1_z);        /* Z1^2 */
+    ecp_nistz256_sqr_mont(Z1sqr, in1_z); /* Z1^2 */
 
-    ecp_nistz256_mul_mont(U2, in2_x, Z1sqr);    /* U2 = X2*Z1^2 */
-    ecp_nistz256_sub(H, U2, in1_x);             /* H = U2 - U1 */
+    ecp_nistz256_mul_mont(U2, in2_x, Z1sqr); /* U2 = X2*Z1^2 */
+    ecp_nistz256_sub(H, U2, in1_x); /* H = U2 - U1 */
 
-    ecp_nistz256_mul_mont(S2, Z1sqr, in1_z);    /* S2 = Z1^3 */
+    ecp_nistz256_mul_mont(S2, Z1sqr, in1_z); /* S2 = Z1^3 */
 
-    ecp_nistz256_mul_mont(res_z, H, in1_z);     /* Z3 = H*Z1*Z2 */
+    ecp_nistz256_mul_mont(res_z, H, in1_z); /* Z3 = H*Z1*Z2 */
 
-    ecp_nistz256_mul_mont(S2, S2, in2_y);       /* S2 = Y2*Z1^3 */
-    ecp_nistz256_sub(R, S2, in1_y);             /* R = S2 - S1 */
+    ecp_nistz256_mul_mont(S2, S2, in2_y); /* S2 = Y2*Z1^3 */
+    ecp_nistz256_sub(R, S2, in1_y); /* R = S2 - S1 */
 
-    ecp_nistz256_sqr_mont(Hsqr, H);             /* H^2 */
-    ecp_nistz256_sqr_mont(Rsqr, R);             /* R^2 */
-    ecp_nistz256_mul_mont(Hcub, Hsqr, H);       /* H^3 */
+    ecp_nistz256_sqr_mont(Hsqr, H); /* H^2 */
+    ecp_nistz256_sqr_mont(Rsqr, R); /* R^2 */
+    ecp_nistz256_mul_mont(Hcub, Hsqr, H); /* H^3 */
 
-    ecp_nistz256_mul_mont(U2, in1_x, Hsqr);     /* U1*H^2 */
-    ecp_nistz256_mul_by_2(Hsqr, U2);            /* 2*U1*H^2 */
+    ecp_nistz256_mul_mont(U2, in1_x, Hsqr); /* U1*H^2 */
+    ecp_nistz256_mul_by_2(Hsqr, U2); /* 2*U1*H^2 */
 
     ecp_nistz256_sub(res_x, Rsqr, Hsqr);
     ecp_nistz256_sub(res_x, res_x, Hcub);
@@ -467,8 +473,10 @@ static void ecp_nistz256_point_add_affine(P256_POINT * r,
 static void ecp_nistz256_mod_inverse(BN_ULONG r[P256_LIMBS],
                                      const BN_ULONG in[P256_LIMBS])
 {
-    /* The poly is ffffffff 00000001 00000000 00000000 00000000 ffffffff ffffffff ffffffff
-       We use FLT and used poly-2 as exponent */
+    /*
+     * The poly is ffffffff 00000001 00000000 00000000 00000000 ffffffff
+     * ffffffff ffffffff We use FLT and used poly-2 as exponent 
+     */
     BN_ULONG p2[P256_LIMBS];
     BN_ULONG p4[P256_LIMBS];
     BN_ULONG p8[P256_LIMBS];
@@ -478,27 +486,27 @@ static void ecp_nistz256_mod_inverse(BN_ULONG r[P256_LIMBS],
     int i;
 
     ecp_nistz256_sqr_mont(res, in);
-    ecp_nistz256_mul_mont(p2, res, in);         /* 3*p */
+    ecp_nistz256_mul_mont(p2, res, in); /* 3*p */
 
     ecp_nistz256_sqr_mont(res, p2);
     ecp_nistz256_sqr_mont(res, res);
-    ecp_nistz256_mul_mont(p4, res, p2);         /* f*p */
+    ecp_nistz256_mul_mont(p4, res, p2); /* f*p */
 
     ecp_nistz256_sqr_mont(res, p4);
     ecp_nistz256_sqr_mont(res, res);
     ecp_nistz256_sqr_mont(res, res);
     ecp_nistz256_sqr_mont(res, res);
-    ecp_nistz256_mul_mont(p8, res, p4);         /* ff*p */
+    ecp_nistz256_mul_mont(p8, res, p4); /* ff*p */
 
     ecp_nistz256_sqr_mont(res, p8);
     for (i = 0; i < 7; i++)
         ecp_nistz256_sqr_mont(res, res);
-    ecp_nistz256_mul_mont(p16, res, p8);        /* ffff*p */
+    ecp_nistz256_mul_mont(p16, res, p8); /* ffff*p */
 
     ecp_nistz256_sqr_mont(res, p16);
     for (i = 0; i < 15; i++)
         ecp_nistz256_sqr_mont(res, res);
-    ecp_nistz256_mul_mont(p32, res, p16);       /* ffffffff*p */
+    ecp_nistz256_mul_mont(p32, res, p16); /* ffffffff*p */
 
     ecp_nistz256_sqr_mont(res, p32);
     for (i = 0; i < 31; i++)
@@ -538,20 +546,22 @@ static void ecp_nistz256_mod_inverse(BN_ULONG r[P256_LIMBS],
     memcpy(r, res, sizeof(res));
 }
 
-/* ecp_nistz256_bignum_to_field_elem copies the contents of |in| to |out| and
- * returns one if it fits. Otherwise it returns zero. */
+/*
+ * ecp_nistz256_bignum_to_field_elem copies the contents of |in| to |out| and
+ * returns one if it fits. Otherwise it returns zero. 
+ */
 static int ecp_nistz256_bignum_to_field_elem(BN_ULONG out[P256_LIMBS],
-                                             const BIGNUM * in)
+                                             const BIGNUM *in)
 {
     return bn_copy_words(out, in, P256_LIMBS);
 }
 
 /* r = sum(scalar[i]*point[i]) */
-static void ecp_nistz256_windowed_mul(const EC_GROUP * group,
-                                      P256_POINT * r,
-                                      const BIGNUM ** scalar,
-                                      const EC_POINT ** point,
-                                      int num, BN_CTX * ctx)
+static void ecp_nistz256_windowed_mul(const EC_GROUP *group,
+                                      P256_POINT *r,
+                                      const BIGNUM **scalar,
+                                      const EC_POINT **point,
+                                      int num, BN_CTX *ctx)
 {
     int i, j;
     unsigned int index;
@@ -559,9 +569,9 @@ static void ecp_nistz256_windowed_mul(const EC_GROUP * group,
     const unsigned int window_size = 5;
     const unsigned int mask = (1 << (window_size + 1)) - 1;
     unsigned int wvalue;
-    P256_POINT *temp;   /* place for 5 temporary points */
+    P256_POINT *temp;           /* place for 5 temporary points */
     const BIGNUM **scalars = NULL;
-    P256_POINT(*table)[16] = NULL;
+    P256_POINT (*table)[16] = NULL;
     void *table_storage = NULL;
 
     if ((table_storage =
@@ -574,7 +584,7 @@ static void ecp_nistz256_windowed_mul(const EC_GROUP * group,
     }
 
     table = (void *)ALIGNPTR(table_storage, 64);
-    temp  = (P256_POINT *)(table + num);
+    temp = (P256_POINT *)(table + num);
 
     for (i = 0; i < num; i++) {
         P256_POINT *row = table[i];
@@ -613,46 +623,48 @@ static void ecp_nistz256_windowed_mul(const EC_GROUP * group,
         if (!ecp_nistz256_bignum_to_field_elem(temp[0].X, point[i]->X)
             || !ecp_nistz256_bignum_to_field_elem(temp[0].Y, point[i]->Y)
             || !ecp_nistz256_bignum_to_field_elem(temp[0].Z, point[i]->Z)) {
-            ECerr(EC_F_ECP_NISTZ256_WINDOWED_MUL, EC_R_COORDINATES_OUT_OF_RANGE);
+            ECerr(EC_F_ECP_NISTZ256_WINDOWED_MUL,
+                  EC_R_COORDINATES_OUT_OF_RANGE);
             goto err;
         }
 
-        /* row[0] is implicitly (0,0,0) (the point at infinity),
-         * therefore it is not stored. All other values are actually
-         * stored with an offset of -1 in table.
+        /*
+         * row[0] is implicitly (0,0,0) (the point at infinity), therefore it 
+         * is not stored. All other values are actually stored with an offset 
+         * of -1 in table. 
          */
 
-        ecp_nistz256_scatter_w5  (row, &temp[0], 1);
-        ecp_nistz256_point_double(&temp[1], &temp[0]);              /*1+1=2  */
-        ecp_nistz256_scatter_w5  (row, &temp[1], 2);
-        ecp_nistz256_point_add   (&temp[2], &temp[1], &temp[0]);    /*2+1=3  */
-        ecp_nistz256_scatter_w5  (row, &temp[2], 3);
-        ecp_nistz256_point_double(&temp[1], &temp[1]);              /*2*2=4  */
-        ecp_nistz256_scatter_w5  (row, &temp[1], 4);
-        ecp_nistz256_point_double(&temp[2], &temp[2]);              /*2*3=6  */
-        ecp_nistz256_scatter_w5  (row, &temp[2], 6);
-        ecp_nistz256_point_add   (&temp[3], &temp[1], &temp[0]);    /*4+1=5  */
-        ecp_nistz256_scatter_w5  (row, &temp[3], 5);
-        ecp_nistz256_point_add   (&temp[4], &temp[2], &temp[0]);    /*6+1=7  */
-        ecp_nistz256_scatter_w5  (row, &temp[4], 7);
-        ecp_nistz256_point_double(&temp[1], &temp[1]);              /*2*4=8  */
-        ecp_nistz256_scatter_w5  (row, &temp[1], 8);
-        ecp_nistz256_point_double(&temp[2], &temp[2]);              /*2*6=12 */
-        ecp_nistz256_scatter_w5  (row, &temp[2], 12);
-        ecp_nistz256_point_double(&temp[3], &temp[3]);              /*2*5=10 */
-        ecp_nistz256_scatter_w5  (row, &temp[3], 10);
-        ecp_nistz256_point_double(&temp[4], &temp[4]);              /*2*7=14 */
-        ecp_nistz256_scatter_w5  (row, &temp[4], 14);
-        ecp_nistz256_point_add   (&temp[2], &temp[2], &temp[0]);    /*12+1=13*/
-        ecp_nistz256_scatter_w5  (row, &temp[2], 13);
-        ecp_nistz256_point_add   (&temp[3], &temp[3], &temp[0]);    /*10+1=11*/
-        ecp_nistz256_scatter_w5  (row, &temp[3], 11);
-        ecp_nistz256_point_add   (&temp[4], &temp[4], &temp[0]);    /*14+1=15*/
-        ecp_nistz256_scatter_w5  (row, &temp[4], 15);
-        ecp_nistz256_point_add   (&temp[2], &temp[1], &temp[0]);    /*8+1=9  */
-        ecp_nistz256_scatter_w5  (row, &temp[2], 9);
-        ecp_nistz256_point_double(&temp[1], &temp[1]);              /*2*8=16 */
-        ecp_nistz256_scatter_w5  (row, &temp[1], 16);
+        ecp_nistz256_scatter_w5(row, &temp[0], 1);
+        ecp_nistz256_point_double(&temp[1], &temp[0]); /* 1+1=2 */
+        ecp_nistz256_scatter_w5(row, &temp[1], 2);
+        ecp_nistz256_point_add(&temp[2], &temp[1], &temp[0]); /* 2+1=3 */
+        ecp_nistz256_scatter_w5(row, &temp[2], 3);
+        ecp_nistz256_point_double(&temp[1], &temp[1]); /* 2*2=4 */
+        ecp_nistz256_scatter_w5(row, &temp[1], 4);
+        ecp_nistz256_point_double(&temp[2], &temp[2]); /* 2*3=6 */
+        ecp_nistz256_scatter_w5(row, &temp[2], 6);
+        ecp_nistz256_point_add(&temp[3], &temp[1], &temp[0]); /* 4+1=5 */
+        ecp_nistz256_scatter_w5(row, &temp[3], 5);
+        ecp_nistz256_point_add(&temp[4], &temp[2], &temp[0]); /* 6+1=7 */
+        ecp_nistz256_scatter_w5(row, &temp[4], 7);
+        ecp_nistz256_point_double(&temp[1], &temp[1]); /* 2*4=8 */
+        ecp_nistz256_scatter_w5(row, &temp[1], 8);
+        ecp_nistz256_point_double(&temp[2], &temp[2]); /* 2*6=12 */
+        ecp_nistz256_scatter_w5(row, &temp[2], 12);
+        ecp_nistz256_point_double(&temp[3], &temp[3]); /* 2*5=10 */
+        ecp_nistz256_scatter_w5(row, &temp[3], 10);
+        ecp_nistz256_point_double(&temp[4], &temp[4]); /* 2*7=14 */
+        ecp_nistz256_scatter_w5(row, &temp[4], 14);
+        ecp_nistz256_point_add(&temp[2], &temp[2], &temp[0]); /* 12+1=13 */
+        ecp_nistz256_scatter_w5(row, &temp[2], 13);
+        ecp_nistz256_point_add(&temp[3], &temp[3], &temp[0]); /* 10+1=11 */
+        ecp_nistz256_scatter_w5(row, &temp[3], 11);
+        ecp_nistz256_point_add(&temp[4], &temp[4], &temp[0]); /* 14+1=15 */
+        ecp_nistz256_scatter_w5(row, &temp[4], 15);
+        ecp_nistz256_point_add(&temp[2], &temp[1], &temp[0]); /* 8+1=9 */
+        ecp_nistz256_scatter_w5(row, &temp[2], 9);
+        ecp_nistz256_point_double(&temp[1], &temp[1]); /* 2*8=16 */
+        ecp_nistz256_scatter_w5(row, &temp[1], 16);
     }
 
     index = 255;
@@ -708,7 +720,7 @@ static void ecp_nistz256_windowed_mul(const EC_GROUP * group,
         ecp_nistz256_point_add(r, r, &temp[0]);
     }
 
-err:
+ err:
     if (table_storage)
         OPENSSL_free(table_storage);
     if (p_str)
@@ -728,9 +740,11 @@ const static BN_ULONG def_yG[P256_LIMBS] = {
     TOBN(0xd2e88688, 0xdd21f325), TOBN(0x8571ff18, 0x25885d85)
 };
 
-/* ecp_nistz256_is_affine_G returns one if |generator| is the standard,
- * P-256 generator. */
-static int ecp_nistz256_is_affine_G(const EC_POINT * generator)
+/*
+ * ecp_nistz256_is_affine_G returns one if |generator| is the standard, P-256 
+ * generator. 
+ */
+static int ecp_nistz256_is_affine_G(const EC_POINT *generator)
 {
     return (bn_get_top(generator->X) == P256_LIMBS) &&
         (bn_get_top(generator->Y) == P256_LIMBS) &&
@@ -740,12 +754,14 @@ static int ecp_nistz256_is_affine_G(const EC_POINT * generator)
         is_one(bn_get_words(generator->Z));
 }
 
-static int ecp_nistz256_mult_precompute(EC_GROUP * group, BN_CTX * ctx)
+static int ecp_nistz256_mult_precompute(EC_GROUP *group, BN_CTX *ctx)
 {
-    /* We precompute a table for a Booth encoded exponent (wNAF) based
+    /*
+     * We precompute a table for a Booth encoded exponent (wNAF) based
      * computation. Each table holds 64 values for safe access, with an
-     * implicit value of infinity at index zero. We use window of size 7,
-     * and therefore require ceil(256/7) = 37 tables. */
+     * implicit value of infinity at index zero. We use window of size 7, and 
+     * therefore require ceil(256/7) = 37 tables. 
+     */
     BIGNUM *order;
     EC_POINT *P = NULL, *T = NULL;
     const EC_POINT *generator;
@@ -768,8 +784,10 @@ static int ecp_nistz256_mult_precompute(EC_GROUP * group, BN_CTX * ctx)
     }
 
     if (ecp_nistz256_is_affine_G(generator)) {
-        /* No need to calculate tables for the standard generator
-         * because we have them statically. */
+        /*
+         * No need to calculate tables for the standard generator because we
+         * have them statically. 
+         */
         return 1;
     }
 
@@ -809,17 +827,20 @@ static int ecp_nistz256_mult_precompute(EC_GROUP * group, BN_CTX * ctx)
     P = EC_POINT_new(group);
     T = EC_POINT_new(group);
 
-    /* The zero entry is implicitly infinity, and we skip it,
-     * storing other values with -1 offset. */
+    /*
+     * The zero entry is implicitly infinity, and we skip it, storing other
+     * values with -1 offset. 
+     */
     EC_POINT_copy(T, generator);
 
     for (k = 0; k < 64; k++) {
         EC_POINT_copy(P, T);
         for (j = 0; j < 37; j++) {
             P256_POINT_AFFINE temp;
-            /* It would be faster to use
-             * ec_GFp_simple_points_make_affine and make multiple
-             * points affine at the same time. */
+            /*
+             * It would be faster to use ec_GFp_simple_points_make_affine and 
+             * make multiple points affine at the same time. 
+             */
             ec_GFp_simple_make_affine(group, P, ctx);
             ecp_nistz256_bignum_to_field_elem(temp.X, P->X);
             ecp_nistz256_bignum_to_field_elem(temp.Y, P->Y);
@@ -848,7 +869,7 @@ static int ecp_nistz256_mult_precompute(EC_GROUP * group, BN_CTX * ctx)
 
     ret = 1;
 
-err:
+ err:
     if (ctx != NULL)
         BN_CTX_end(ctx);
     if (pre_comp)
@@ -878,8 +899,9 @@ err:
 #  undef ECP_NISTZ256_AVX2
 # else
 /* Constant time access, loading four values, from four consecutive tables */
-void ecp_nistz256_avx2_multi_gather_w7(void *result, const void *in, int index0,
-                                       int index1, int index2, int index3);
+void ecp_nistz256_avx2_multi_gather_w7(void *result, const void *in,
+                                       int index0, int index1, int index2,
+                                       int index3);
 void ecp_nistz256_avx2_transpose_convert(void *RESULTx4, const void *in);
 void ecp_nistz256_avx2_convert_transpose_back(void *result, const void *Ax4);
 void ecp_nistz256_avx2_point_add_affine_x4(void *RESULTx4, const void *Ax4,
@@ -905,13 +927,13 @@ static void booth_recode_w7(unsigned char *sign,
     *digit = d;
 }
 
-/* ecp_nistz256_avx2_mul_g performs multiplication by G, using only the
+/*
+ * ecp_nistz256_avx2_mul_g performs multiplication by G, using only the
  * precomputed table. It does 4 affine point additions in parallel,
- * significantly speeding up point multiplication for a fixed value. */
-static void ecp_nistz256_avx2_mul_g(P256_POINT * r,
-                                    unsigned char p_str[33],
-                                    const
-                                    P256_POINT_AFFINE(*preComputedTable)[64])
+ * significantly speeding up point multiplication for a fixed value. 
+ */
+static void ecp_nistz256_avx2_mul_g(P256_POINT *r, unsigned char p_str[33], const
+                                    P256_POINT_AFFINE (*preComputedTable)[64])
 {
     const unsigned int window_size = 7;
     const unsigned int mask = (1 << (window_size + 1)) - 1;
@@ -1047,8 +1069,8 @@ static void ecp_nistz256_avx2_mul_g(P256_POINT * r,
     wvalue = *((u16 *) & p_str[(index - 1) / 8]);
     wvalue = (wvalue >> ((index - 1) % 8)) & mask;
     booth_recode_w7(&sign0, &digit0, wvalue);
-    ecp_nistz256_gather_w7((P256_POINT_AFFINE *) r,
-                                preComputedTable[36], digit0);
+    ecp_nistz256_gather_w7((P256_POINT_AFFINE *)r,
+                           preComputedTable[36], digit0);
     ecp_nistz256_neg(tmp, r->Y);
     copy_conditional(r->Y, tmp, sign0);
     memcpy(r->Z, ONE, sizeof(ONE));
@@ -1061,19 +1083,19 @@ static void ecp_nistz256_avx2_mul_g(P256_POINT * r,
 # endif
 #endif
 
-static int ecp_nistz256_set_from_affine(EC_POINT * out, const EC_GROUP * group,
-                                        const P256_POINT_AFFINE * in,
-                                        BN_CTX * ctx)
+static int ecp_nistz256_set_from_affine(EC_POINT *out, const EC_GROUP *group,
+                                        const P256_POINT_AFFINE *in,
+                                        BN_CTX *ctx)
 {
     BIGNUM *x, *y;
     BN_ULONG d_x[P256_LIMBS], d_y[P256_LIMBS];
     int ret = 0;
 
     x = BN_new();
-    if(!x)
+    if (!x)
         return 0;
     y = BN_new();
-    if(!y) {
+    if (!y) {
         BN_free(x);
         return 0;
     }
@@ -1085,19 +1107,21 @@ static int ecp_nistz256_set_from_affine(EC_POINT * out, const EC_GROUP * group,
 
     ret = EC_POINT_set_affine_coordinates_GFp(group, out, x, y, ctx);
 
-    if(x) BN_free(x);
-    if(y) BN_free(y);
+    if (x)
+        BN_free(x);
+    if (y)
+        BN_free(y);
 
     return ret;
 }
 
 /* r = scalar*G + sum(scalars[i]*points[i]) */
-static int ecp_nistz256_points_mul(const EC_GROUP * group,
-                                   EC_POINT * r,
-                                   const BIGNUM * scalar,
+static int ecp_nistz256_points_mul(const EC_GROUP *group,
+                                   EC_POINT *r,
+                                   const BIGNUM *scalar,
                                    size_t num,
-                                   const EC_POINT * points[],
-                                   const BIGNUM * scalars[], BN_CTX * ctx)
+                                   const EC_POINT *points[],
+                                   const BIGNUM *scalars[], BN_CTX *ctx)
 {
     int i = 0, ret = 0, no_precomp_for_generator = 0, p_is_infinity = 0;
     size_t j;
@@ -1115,7 +1139,7 @@ static int ecp_nistz256_points_mul(const EC_GROUP * group,
     } t, p;
     BIGNUM *tmp_scalar;
 
-    if ((num+1) == 0 || (num+1) > OPENSSL_MALLOC_MAX_NELEMS(void *)) {
+    if ((num + 1) == 0 || (num + 1) > OPENSSL_MALLOC_MAX_NELEMS(void *)) {
         ECerr(EC_F_ECP_NISTZ256_POINTS_MUL, ERR_R_MALLOC_FAILURE);
         return 0;
     }
@@ -1156,9 +1180,10 @@ static int ecp_nistz256_points_mul(const EC_GROUP * group,
                                 ecp_nistz256_pre_comp_clear_free);
 
         if (pre_comp) {
-            /* If there is a precomputed table for the generator,
-             * check that it was generated with the same
-             * generator. */
+            /*
+             * If there is a precomputed table for the generator, check that
+             * it was generated with the same generator. 
+             */
             EC_POINT *pre_comp_generator = EC_POINT_new(group);
             if (pre_comp_generator == NULL)
                 goto err;
@@ -1175,10 +1200,12 @@ static int ecp_nistz256_points_mul(const EC_GROUP * group,
         }
 
         if (preComputedTable == NULL && ecp_nistz256_is_affine_G(generator)) {
-            /* If there is no precomputed data, but the generator
-             * is the default, a hardcoded table of precomputed
-             * data is used. This is because applications, such as
-             * Apache, do not use EC_KEY_precompute_mult. */
+            /*
+             * If there is no precomputed data, but the generator is the
+             * default, a hardcoded table of precomputed data is used. This
+             * is because applications, such as Apache, do not use
+             * EC_KEY_precompute_mult. 
+             */
             preComputedTable = ecp_nistz256_precomputed;
         }
 
@@ -1226,7 +1253,8 @@ static int ecp_nistz256_points_mul(const EC_GROUP * group,
 
                 wvalue = _booth_recode_w7(wvalue);
 
-                ecp_nistz256_gather_w7(&p.a, preComputedTable[0], wvalue >> 1);
+                ecp_nistz256_gather_w7(&p.a, preComputedTable[0],
+                                       wvalue >> 1);
 
                 ecp_nistz256_neg(p.p.Z, p.p.Y);
                 copy_conditional(p.p.Y, p.p.Z, wvalue & 1);
@@ -1258,8 +1286,10 @@ static int ecp_nistz256_points_mul(const EC_GROUP * group,
         p_is_infinity = 1;
 
     if (no_precomp_for_generator) {
-        /* Without a precomputed table for the generator, it has to be
-         * handled like a normal point. */
+        /*
+         * Without a precomputed table for the generator, it has to be
+         * handled like a normal point. 
+         */
         const BIGNUM **new_scalars;
         const EC_POINT **new_points;
 
@@ -1311,13 +1341,13 @@ static int ecp_nistz256_points_mul(const EC_GROUP * group,
 
     ret = 1;
 
-err:
+ err:
     return ret;
 }
 
-static int ecp_nistz256_get_affine(const EC_GROUP * group,
-                                   const EC_POINT * point,
-                                   BIGNUM * x, BIGNUM * y, BN_CTX * ctx)
+static int ecp_nistz256_get_affine(const EC_GROUP *group,
+                                   const EC_POINT *point,
+                                   BIGNUM *x, BIGNUM *y, BN_CTX *ctx)
 {
     BN_ULONG z_inv2[P256_LIMBS];
     BN_ULONG z_inv3[P256_LIMBS];
@@ -1360,14 +1390,14 @@ static int ecp_nistz256_get_affine(const EC_GROUP * group,
     return 1;
 }
 
-static EC_PRE_COMP *ecp_nistz256_pre_comp_new(const EC_GROUP * group)
+static EC_PRE_COMP *ecp_nistz256_pre_comp_new(const EC_GROUP *group)
 {
     EC_PRE_COMP *ret = NULL;
 
     if (!group)
         return NULL;
 
-    ret = (EC_PRE_COMP *) OPENSSL_malloc(sizeof(EC_PRE_COMP));
+    ret = (EC_PRE_COMP *)OPENSSL_malloc(sizeof(EC_PRE_COMP));
 
     if (!ret) {
         ECerr(EC_F_ECP_NISTZ256_PRE_COMP_NEW, ERR_R_MALLOC_FAILURE);
@@ -1431,7 +1461,7 @@ static void ecp_nistz256_pre_comp_clear_free(void *pre_)
     OPENSSL_free(pre);
 }
 
-static int ecp_nistz256_window_have_precompute_mult(const EC_GROUP * group)
+static int ecp_nistz256_window_have_precompute_mult(const EC_GROUP *group)
 {
     /* There is a hard-coded table for the default generator. */
     const EC_POINT *generator = EC_GROUP_get0_generator(group);
@@ -1476,12 +1506,12 @@ const EC_METHOD *EC_GFp_nistz256_method(void)
         ec_GFp_simple_cmp,
         ec_GFp_simple_make_affine,
         ec_GFp_simple_points_make_affine,
-        ecp_nistz256_points_mul,                    /* mul */
-        ecp_nistz256_mult_precompute,               /* precompute_mult */
-        ecp_nistz256_window_have_precompute_mult,   /* have_precompute_mult */
+        ecp_nistz256_points_mul, /* mul */
+        ecp_nistz256_mult_precompute, /* precompute_mult */
+        ecp_nistz256_window_have_precompute_mult, /* have_precompute_mult */
         ec_GFp_mont_field_mul,
         ec_GFp_mont_field_sqr,
-        0,                                          /* field_div */
+        0,                      /* field_div */
         ec_GFp_mont_field_encode,
         ec_GFp_mont_field_decode,
         ec_GFp_mont_field_set_to_one

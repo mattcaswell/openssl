@@ -78,102 +78,100 @@
  */
 
 int DES_enc_write(int fd, const void *_buf, int len,
-		  DES_key_schedule *sched, DES_cblock *iv)
-	{
+                  DES_key_schedule *sched, DES_cblock *iv)
+{
 #if defined(OPENSSL_NO_POSIX_IO)
-	return (-1);
+    return (-1);
 #else
-#ifdef _LIBC
-	extern unsigned long time();
-	extern int write();
-#endif
-	const unsigned char *buf=_buf;
-	long rnum;
-	int i,j,k,outnum;
-	static unsigned char *outbuf=NULL;
-	unsigned char shortbuf[8];
-	unsigned char *p;
-	const unsigned char *cp;
-	static int start=1;
+# ifdef _LIBC
+    extern unsigned long time();
+    extern int write();
+# endif
+    const unsigned char *buf = _buf;
+    long rnum;
+    int i, j, k, outnum;
+    static unsigned char *outbuf = NULL;
+    unsigned char shortbuf[8];
+    unsigned char *p;
+    const unsigned char *cp;
+    static int start = 1;
 
-	if (outbuf == NULL)
-		{
-		outbuf=OPENSSL_malloc(BSIZE+HDRSIZE);
-		if (outbuf == NULL) return(-1);
-		}
-	/* If we are sending less than 8 bytes, the same char will look
-	 * the same if we don't pad it out with random bytes */
-	if (start)
-		{
-		start=0;
-		}
+    if (outbuf == NULL) {
+        outbuf = OPENSSL_malloc(BSIZE + HDRSIZE);
+        if (outbuf == NULL)
+            return (-1);
+    }
+    /*
+     * If we are sending less than 8 bytes, the same char will look the same
+     * if we don't pad it out with random bytes 
+     */
+    if (start) {
+        start = 0;
+    }
 
-	/* lets recurse if we want to send the data in small chunks */
-	if (len > MAXWRITE)
-		{
-		j=0;
-		for (i=0; i<len; i+=k)
-			{
-			k=DES_enc_write(fd,&(buf[i]),
-				((len-i) > MAXWRITE)?MAXWRITE:(len-i),sched,iv);
-			if (k < 0)
-				return(k);
-			else
-				j+=k;
-			}
-		return(j);
-		}
+    /* lets recurse if we want to send the data in small chunks */
+    if (len > MAXWRITE) {
+        j = 0;
+        for (i = 0; i < len; i += k) {
+            k = DES_enc_write(fd, &(buf[i]),
+                              ((len - i) > MAXWRITE) ? MAXWRITE : (len - i),
+                              sched, iv);
+            if (k < 0)
+                return (k);
+            else
+                j += k;
+        }
+        return (j);
+    }
 
-	/* write length first */
-	p=outbuf;
-	l2n(len,p);
+    /* write length first */
+    p = outbuf;
+    l2n(len, p);
 
-	/* pad short strings */
-	if (len < 8)
-		{
-		cp=shortbuf;
-		memcpy(shortbuf,buf,len);
-		RAND_pseudo_bytes(shortbuf+len, 8-len);
-		rnum=8;
-		}
-	else
-		{
-		cp=buf;
-		rnum=((len+7)/8*8); /* round up to nearest eight */
-		}
+    /* pad short strings */
+    if (len < 8) {
+        cp = shortbuf;
+        memcpy(shortbuf, buf, len);
+        RAND_pseudo_bytes(shortbuf + len, 8 - len);
+        rnum = 8;
+    } else {
+        cp = buf;
+        rnum = ((len + 7) / 8 * 8); /* round up to nearest eight */
+    }
 
-	if (DES_rw_mode & DES_PCBC_MODE)
-		DES_pcbc_encrypt(cp,&(outbuf[HDRSIZE]),(len<8)?8:len,sched,iv,
-				 DES_ENCRYPT); 
-	else
-		DES_cbc_encrypt(cp,&(outbuf[HDRSIZE]),(len<8)?8:len,sched,iv,
-				DES_ENCRYPT); 
+    if (DES_rw_mode & DES_PCBC_MODE)
+        DES_pcbc_encrypt(cp, &(outbuf[HDRSIZE]), (len < 8) ? 8 : len, sched,
+                         iv, DES_ENCRYPT);
+    else
+        DES_cbc_encrypt(cp, &(outbuf[HDRSIZE]), (len < 8) ? 8 : len, sched,
+                        iv, DES_ENCRYPT);
 
-	/* output */
-	outnum=rnum+HDRSIZE;
+    /* output */
+    outnum = rnum + HDRSIZE;
 
-	for (j=0; j<outnum; j+=i)
-		{
-		/* eay 26/08/92 I was not doing writing from where we
-		 * got up to. */
-#ifndef _WIN32
-		i=write(fd,(void *)&(outbuf[j]),outnum-j);
-#else
-		i=_write(fd,(void *)&(outbuf[j]),outnum-j);
-#endif
-		if (i == -1)
-			{
-#ifdef EINTR
-			if (errno == EINTR)
-				i=0;
-			else
-#endif
-			        /* This is really a bad error - very bad
-				 * It will stuff-up both ends. */
-				return(-1);
-			}
-		}
+    for (j = 0; j < outnum; j += i) {
+        /*
+         * eay 26/08/92 I was not doing writing from where we got up to. 
+         */
+# ifndef _WIN32
+        i = write(fd, (void *)&(outbuf[j]), outnum - j);
+# else
+        i = _write(fd, (void *)&(outbuf[j]), outnum - j);
+# endif
+        if (i == -1) {
+# ifdef EINTR
+            if (errno == EINTR)
+                i = 0;
+            else
+# endif
+                /*
+                 * This is really a bad error - very bad It will stuff-up
+                 * both ends. 
+                 */
+                return (-1);
+        }
+    }
 
-	return(len);
-#endif /* OPENSSL_NO_POSIX_IO */
-	}
+    return (len);
+#endif                          /* OPENSSL_NO_POSIX_IO */
+}

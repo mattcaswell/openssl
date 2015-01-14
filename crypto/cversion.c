@@ -59,54 +59,49 @@
 #include "cryptlib.h"
 
 #ifndef NO_WINDOWS_BRAINDEATH
-#include "buildinf.h"
+# include "buildinf.h"
 #endif
 
 const char *SSLeay_version(int t)
-	{
-	if (t == SSLEAY_VERSION)
-		return OPENSSL_VERSION_TEXT;
-	if (t == SSLEAY_BUILT_ON)
-		{
+{
+    if (t == SSLEAY_VERSION)
+        return OPENSSL_VERSION_TEXT;
+    if (t == SSLEAY_BUILT_ON) {
 #ifdef DATE
 # ifdef OPENSSL_USE_BUILD_DATE
-		return(DATE);
+        return (DATE);
 # else
-		return("built on: reproducible build, date unspecified");
+        return ("built on: reproducible build, date unspecified");
 # endif
 #else
-		return("built on: date not available");
+        return ("built on: date not available");
 #endif
-		}
-	if (t == SSLEAY_CFLAGS)
-		{
+    }
+    if (t == SSLEAY_CFLAGS) {
 #ifdef CFLAGS
-		return(CFLAGS);
+        return (CFLAGS);
 #else
-		return("compiler: information not available");
+        return ("compiler: information not available");
 #endif
-		}
-	if (t == SSLEAY_PLATFORM)
-		{
+    }
+    if (t == SSLEAY_PLATFORM) {
 #ifdef PLATFORM
-		return(PLATFORM);
+        return (PLATFORM);
 #else
-		return("platform: information not available");
+        return ("platform: information not available");
 #endif
-		}
-	if (t == SSLEAY_DIR)
-		{
+    }
+    if (t == SSLEAY_DIR) {
 #ifdef OPENSSLDIR
-		return "OPENSSLDIR: \"" OPENSSLDIR "\"";
+        return "OPENSSLDIR: \"" OPENSSLDIR "\"";
 #else
-		return "OPENSSLDIR: N/A";
+        return "OPENSSLDIR: N/A";
 #endif
-		}
-	return("not available");
-	}
+    }
+    return ("not available");
+}
 
 unsigned long SSLeay(void)
-	{
-	return(SSLEAY_VERSION_NUMBER);
-	}
-
+{
+    return (SSLEAY_VERSION_NUMBER);
+}

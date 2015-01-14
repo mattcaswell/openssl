@@ -1,6 +1,7 @@
 /* crypto/aes/aes_wrap.c */
-/* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
- * project.
+/*
+ * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
+ * project. 
  */
 /* ====================================================================
  * Copyright (c) 2008 The OpenSSL Project.  All rights reserved.
@@ -56,15 +57,16 @@
 #include <openssl/modes.h>
 
 int AES_wrap_key(AES_KEY *key, const unsigned char *iv,
-		unsigned char *out,
-		const unsigned char *in, unsigned int inlen)
-	{
-	return CRYPTO_128_wrap(key, iv, out, in, inlen, (block128_f)AES_encrypt);
-	}
+                 unsigned char *out,
+                 const unsigned char *in, unsigned int inlen)
+{
+    return CRYPTO_128_wrap(key, iv, out, in, inlen, (block128_f) AES_encrypt);
+}
 
 int AES_unwrap_key(AES_KEY *key, const unsigned char *iv,
-		unsigned char *out,
-		const unsigned char *in, unsigned int inlen)
-	{
-	return CRYPTO_128_unwrap(key, iv, out, in, inlen, (block128_f)AES_decrypt);
-	}
+                   unsigned char *out,
+                   const unsigned char *in, unsigned int inlen)
+{
+    return CRYPTO_128_unwrap(key, iv, out, in, inlen,
+                             (block128_f) AES_decrypt);
+}

@@ -56,7 +56,7 @@
  * [including the GNU Public Licence.]
  */
 
-/*  @(#)des.h	2.2 88/08/10 4.0 RPCSRC; from 2.7 88/02/08 SMI  */
+/*  @(#)des.h  2.2 88/08/10 4.0 RPCSRC; from 2.7 88/02/08 SMI  */
 /*-
  * Sun RPC is a product of Sun Microsystems, Inc. and is provided for
  * unrestricted use provided that this legend is included on all tape
@@ -91,12 +91,12 @@
  * Copyright (c) 1986 by Sun Microsystems, Inc.
  */
 
-#define DES_MAXLEN 	65536	/* maximum # of bytes to encrypt  */
-#define DES_QUICKLEN	16	/* maximum # of bytes to encrypt quickly */
+#define DES_MAXLEN      65536   /* maximum # of bytes to encrypt */
+#define DES_QUICKLEN    16      /* maximum # of bytes to encrypt quickly */
 
 #ifdef HEADER_DES_H
-#undef ENCRYPT
-#undef DECRYPT
+# undef ENCRYPT
+# undef DECRYPT
 #endif
 
 enum desdir { ENCRYPT, DECRYPT };
@@ -106,26 +106,25 @@ enum desmode { CBC, ECB };
  * parameters to ioctl call
  */
 struct desparams {
-	unsigned char des_key[8];	/* key (with low bit parity) */
-	enum desdir des_dir;	/* direction */
-	enum desmode des_mode;	/* mode */
-	unsigned char des_ivec[8];	/* input vector */
-	unsigned des_len;	/* number of bytes to crypt */
-	union {
-		unsigned char UDES_data[DES_QUICKLEN];
-		unsigned char *UDES_buf;
-	} UDES;
-#	define des_data UDES.UDES_data	/* direct data here if quick */
-#	define des_buf	UDES.UDES_buf	/* otherwise, pointer to data */
+    unsigned char des_key[8];   /* key (with low bit parity) */
+    enum desdir des_dir;        /* direction */
+    enum desmode des_mode;      /* mode */
+    unsigned char des_ivec[8];  /* input vector */
+    unsigned des_len;           /* number of bytes to crypt */
+    union {
+        unsigned char UDES_data[DES_QUICKLEN];
+        unsigned char *UDES_buf;
+    } UDES;
+#define des_data UDES.UDES_data /* direct data here if quick */
+#define des_buf  UDES.UDES_buf  /* otherwise, pointer to data */
 };
 
 /*
  * Encrypt an arbitrary sized buffer
  */
-#define	DESIOCBLOCK	_IOWR('d', 6, struct desparams)
+#define DESIOCBLOCK     _IOWR('d', 6, struct desparams)
 
-/* 
+/*
  * Encrypt of small amount of data, quickly
  */
-#define DESIOCQUICK	_IOWR('d', 7, struct desparams) 
-
+#define DESIOCQUICK     _IOWR('d', 7, struct desparams)
