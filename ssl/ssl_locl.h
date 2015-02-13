@@ -163,6 +163,7 @@
 # endif
 # include <openssl/err.h>
 # include <openssl/ssl.h>
+# include <openssl/async.h>
 # include <openssl/symhacks.h>
 
 #include "record/record.h"
@@ -1194,6 +1195,8 @@ struct ssl_st {
     int (*not_resumable_session_cb) (SSL *ssl, int is_forward_secure);
     
     RECORD_LAYER rlayer;
+    /* Async Job info */
+    ASYNC_JOB *job;
 };
 
 
