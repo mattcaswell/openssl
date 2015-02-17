@@ -4641,3 +4641,5 @@ X509_CRL_get_signature_nid              5000	EXIST::FUNCTION:
 i2d_re_X509_REQ_tbs                     5001	EXIST::FUNCTION:
 X509_REVOKED_get0_extensions            5002	EXIST::FUNCTION:
 ENGINE_load_dasync                      5003	EXIST::FUNCTION:ENGINE,STATIC_ENGINE
+CRYPTO_get_thread_local                 5004	EXIST::FUNCTION:
+CRYPTO_set_thread_local                 5005	EXIST::FUNCTION:

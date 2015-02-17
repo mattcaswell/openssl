@@ -98,6 +98,13 @@ extern "C" {
 # define DECIMAL_SIZE(type)      ((sizeof(type)*8+2)/3+1)
 # define HEX_SIZE(type)          (sizeof(type)*2)
 
+/* Thread Local Storage for windows */
+#define CRYPTO_THREAD_LOCAL_ASYNC_CTX       0
+#define CRYPTO_THREAD_LOCAL_ASYNC_DISPATCH  1
+#define CRYPTO_THREAD_LOCAL_TOTAL_VALS      2
+
+void *CRYPTO_get_thread_local(int idx);
+int CRYPTO_set_thread_local(int idx, void *locdata);
 void OPENSSL_cpuid_setup(void);
 extern unsigned int OPENSSL_ia32cap_P[];
 void OPENSSL_showfatal(const char *fmta, ...);

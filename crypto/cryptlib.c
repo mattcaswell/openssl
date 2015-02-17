@@ -206,13 +206,13 @@ void OPENSSL_cpuid_setup(void)
  */
 # endif
 
-/*
- * All we really need to do is remove the 'error' state when a thread
- * detaches
- */
+/* Address of Thread Local Storage index */
+static DWORD tlsidx;
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
+    void **data;
+
     switch (fdwReason) {
     case DLL_PROCESS_ATTACH:
         OPENSSL_cpuid_setup();
@@ -231,15 +231,56 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
             }
         }
 # endif
-        break;
+        /* Allocate a Thread Local Storage (TLS!!) index */
+        if ((tlsidx = TlsAlloc()) == TLS_OUT_OF_INDEXES)
+            return FALSE;
+
+        /* No break: Initialize the index for first thread */
     case DLL_THREAD_ATTACH:
+        /* Initialize the Thread Local Storage index for this thread */
+        data = (void **) LocalAlloc(LPTR,
+            (sizeof (void *)) * CRYPTO_THREAD_LOCAL_TOTAL_VALS);
+        if (data != NULL) {
+            memset(data, 0, (sizeof (void *)) * CRYPTO_THREAD_LOCAL_TOTAL_VALS);
+            TlsSetValue(tlsidx, data);
+        }
         break;
     case DLL_THREAD_DETACH:
+        /* Release the allocated memory for this thread */
+        data = (void **)TlsGetValue(tlsidx);
+        if (data != NULL)
+            LocalFree((HLOCAL) data);
         break;
     case DLL_PROCESS_DETACH:
+        /* Release the allocated memory for this thread */
+        data = (void **)TlsGetValue(tlsidx);
+        if (data != NULL)
+            LocalFree((HLOCAL) data);
         break;
     }
     return (TRUE);
+}
+
+void *CRYPTO_get_thread_local(int idx)
+{
+    void **data;
+
+    if(!(data = (void **)TlsGetValue(tlsidx)))
+        return NULL;
+
+    return data[idx];
+}
+
+int CRYPTO_set_thread_local(int idx, void *locdata)
+{
+    void **data;
+
+    if(!(data = (void **)TlsGetValue(tlsidx)))
+        return 0;
+
+    data[idx] = locdata;
+
+    return 1;
 }
 #endif
 
