@@ -4644,6 +4644,6 @@ ENGINE_load_dasync                      5003	EXIST::FUNCTION:ENGINE,STATIC_ENGIN
 CRYPTO_get_thread_local                 5004	EXIST::FUNCTION:
 CRYPTO_set_thread_local                 5005	EXIST::FUNCTION:
 ASYNC_pause_job                         5006	EXIST::FUNCTION:
-ASYNC_job_is_waiting                    5007	EXIST::FUNCTION:
+ASYNC_job_is_waiting                    5007	NOEXIST::FUNCTION:
 ASYNC_in_job                            5008	EXIST::FUNCTION:
 ASYNC_start_job                         5009	EXIST::FUNCTION:
