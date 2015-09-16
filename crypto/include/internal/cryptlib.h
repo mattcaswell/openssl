@@ -101,7 +101,8 @@ extern "C" {
 /* Thread Local Storage for windows */
 #define CRYPTO_THREAD_LOCAL_ASYNC_CTX       0
 #define CRYPTO_THREAD_LOCAL_ASYNC_DISPATCH  1
-#define CRYPTO_THREAD_LOCAL_TOTAL_VALS      2
+#define CRYPTO_THREAD_LOCAL_ASYNC_POOL      2
+#define CRYPTO_THREAD_LOCAL_TOTAL_VALS      3
 
 void *CRYPTO_get_thread_local(int idx);
 int CRYPTO_set_thread_local(int idx, void *locdata);
