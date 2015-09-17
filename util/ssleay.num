@@ -406,3 +406,4 @@ SSL_SESSION_get_master_key              440	EXIST::FUNCTION:
 SSL_CTX_set_default_verify_dir          441	EXIST::FUNCTION:
 SSL_CTX_set_default_verify_file         442	EXIST::FUNCTION:
 SSL_waiting_for_async                   443	EXIST::FUNCTION:
+SSL_get_async_wait_fd                   444	EXIST::FUNCTION:

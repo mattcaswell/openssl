@@ -4649,3 +4649,7 @@ ASYNC_in_job                            5008	EXIST::FUNCTION:
 ASYNC_start_job                         5009	EXIST::FUNCTION:
 ASYNC_init_pool                         5010	EXIST::FUNCTION:
 ASYNC_free_pool                         5011	EXIST::FUNCTION:
+ASYNC_wake                              5012	EXIST::FUNCTION:
+ASYNC_clear_wake                        5013	EXIST::FUNCTION:
+ASYNC_get_current_job                   5014	EXIST::FUNCTION:
+ASYNC_get_wait_fd                       5015	EXIST::FUNCTION:
