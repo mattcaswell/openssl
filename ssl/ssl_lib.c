@@ -960,7 +960,7 @@ int SSL_accept(SSL *s)
 
     args.s = s;
 
-    if((s->mode & SSL_MODE_ASYNC) && !ASYNC_in_job()) {
+    if((s->mode & SSL_MODE_ASYNC) && ASYNC_get_current_job() == NULL) {
         switch(ASYNC_start_job(&s->job, &ret, ssl_accept_intern, &args,
             sizeof(struct ssl_async_args))) {
         case ASYNC_ERR:
@@ -1030,7 +1030,7 @@ int SSL_read(SSL *s, void *buf, int num)
     args.buf = buf;
     args.num = num;
 
-    if((s->mode & SSL_MODE_ASYNC) && !ASYNC_in_job()) {
+    if((s->mode & SSL_MODE_ASYNC) && ASYNC_get_current_job() == NULL) {
         switch(ASYNC_start_job(&s->job, &ret, ssl_read_intern, &args,
             sizeof(struct ssl_async_args))) {
         case ASYNC_ERR:
@@ -1103,7 +1103,7 @@ int SSL_write(SSL *s, const void *buf, int num)
     args.buf = (void *) buf;
     args.num = num;
 
-    if((s->mode & SSL_MODE_ASYNC) && !ASYNC_in_job()) {
+    if((s->mode & SSL_MODE_ASYNC) && ASYNC_get_current_job() == NULL) {
         switch(ASYNC_start_job(&s->job, &ret, ssl_write_intern, &args,
             sizeof(struct ssl_async_args))) {
         case ASYNC_ERR:
