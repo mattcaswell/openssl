@@ -1836,6 +1836,7 @@ int s_client_main(int argc, char **argv)
                 break;
             case SSL_ERROR_WANT_ASYNC:
                 BIO_printf(bio_c_out, "write A BLOCK\n");
+                wait_for_async(con);
                 write_ssl = 1;
                 read_tty = 0;
                 break;
@@ -1923,6 +1924,7 @@ int s_client_main(int argc, char **argv)
                 break;
             case SSL_ERROR_WANT_ASYNC:
                 BIO_printf(bio_c_out, "read A BLOCK\n");
+                wait_for_async(con);
                 write_tty = 0;
                 read_ssl = 1;
                 if ((read_tty == 0) && (write_ssl == 0))
