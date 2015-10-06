@@ -4,6 +4,15 @@
 
  Changes between 1.0.2 and 1.1.0  [xx XXX xxxx]
 
+  *) Added ASYNC support. Libcrypto now includes the async sub-library to enable
+     cryptographic operations to be performed asynchronously as long as an
+     asynchronous capable engine is used. See the ASYNC_start_job() man page for
+     further details. Libssl has also had this capability integrated with the
+     introduction of the new mode SSL_MODE_ASYNC and associated error
+     SSL_ERROR_WANT_ASYNC. See the SSL_CTX_set_mode() and SSL_get_error() man
+     pages.
+     [Matt Caswell]
+
   *) Removed DES and RC4 ciphersuites from DEFAULT. Also removed RC2 although
      in 1.0.2 EXPORT was already removed and the only RC2 ciphersuite is also
      an EXPORT one. COMPLEMENTOFDEFAULT has been updated accordingly to add
@@ -15,9 +24,11 @@
      though the change is mostly in the more lenient direction, and
      legacy behaviour is preserved as much as possible.
      [Emilia Käsper]
+
   *) Fix no-stdio build.
     [ David Woodhouse <David.Woodhouse@intel.com> and also
       Ivan Nestlerode <ivan.nestlerode@sonos.com> ]
+
   *) New testing framework
      The testing framework has been largely rewritten and is now using
      perl and the perl modules Test::Harness and an extended variant of
