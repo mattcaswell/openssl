@@ -68,6 +68,7 @@ __thread async_ctx *sysvctx;
 __thread size_t pool_max_size = 0;
 __thread size_t pool_curr_size = 0;
 __thread STACK_OF(ASYNC_JOB) *pool = NULL;
+__thread ASYNC_METHOD *async_posixmethod = &async_default_method;
 
 int async_fibre_init(async_fibre *fibre)
 {

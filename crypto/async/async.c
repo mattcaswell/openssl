@@ -127,7 +127,7 @@ static void async_job_free(ASYNC_JOB *job)
     if(job) {
         if(job->funcargs)
             OPENSSL_free(job->funcargs);
-        async_fibre_free(&job->fibrectx);
+        async_fibre_free(&job->fibre.fibrectx);
         OPENSSL_free(job);
     }
 }
@@ -142,7 +142,7 @@ static ASYNC_JOB *async_get_pool_job(void) {
          * Pool has not been initialised, so init with the defaults, i.e.
          * no max size and no pre-created jobs
          */
-        if (ASYNC_init_pool(0, 0) == 0)
+        if (ASYNC_init_thread(NULL, 0, 0) == 0)
             return NULL;
         pool = async_get_pool();
     }
@@ -155,7 +155,7 @@ static ASYNC_JOB *async_get_pool_job(void) {
 
         job = async_job_new();
         if (job) {
-            async_fibre_makecontext(&job->fibrectx);
+            async_fibre_makecontext(&job->fibre.fibrectx);
             async_increment_pool_size();
         }
     }
@@ -181,7 +181,7 @@ void async_start_func(void)
 
         /* Stop the job */
         job->status = ASYNC_JOB_STOPPING;
-        if(!async_fibre_swapcontext(&job->fibrectx,
+        if(!async_fibre_swapcontext(&job->fibre.fibrectx,
                                     &async_get_ctx()->dispatcher, 1)) {
             /*
              * Should not happen. Getting here will close the thread...can't do
@@ -193,6 +193,12 @@ void async_start_func(void)
 }
 
 int ASYNC_start_job(ASYNC_JOB **job, int *ret, int (*func)(void *),
+                         void *args, size_t size)
+{
+    return async_get_meth()->start_job(job, ret, func, args, size);
+}
+
+static int async_def_start_job(ASYNC_JOB **job, int *ret, int (*func)(void *),
                          void *args, size_t size)
 {
     if(!async_get_ctx() && !async_ctx_new()) {
@@ -224,7 +230,7 @@ int ASYNC_start_job(ASYNC_JOB **job, int *ret, int (*func)(void *),
                 async_get_ctx()->currjob = *job;
                 /* Resume previous job */
                 if(!async_fibre_swapcontext(&async_get_ctx()->dispatcher,
-                    &async_get_ctx()->currjob->fibrectx, 1)) {
+                    &async_get_ctx()->currjob->fibre.fibrectx, 1)) {
                     ASYNCerr(ASYNC_F_ASYNC_START_JOB,
                              ASYNC_R_FAILED_TO_SWAP_CONTEXT);
                     goto err;
@@ -260,7 +266,7 @@ int ASYNC_start_job(ASYNC_JOB **job, int *ret, int (*func)(void *),
 
         async_get_ctx()->currjob->func = func;
         if(!async_fibre_swapcontext(&async_get_ctx()->dispatcher,
-            &async_get_ctx()->currjob->fibrectx, 1)) {
+            &async_get_ctx()->currjob->fibre.fibrectx, 1)) {
             ASYNCerr(ASYNC_F_ASYNC_START_JOB, ASYNC_R_FAILED_TO_SWAP_CONTEXT);
             goto err;
         }
@@ -273,8 +279,12 @@ err:
     return ASYNC_ERR;
 }
 
-
 int ASYNC_pause_job(void)
+{
+    return async_get_meth()->pause_job();
+}
+
+static int async_def_pause_job(void)
 {
     ASYNC_JOB *job;
 
@@ -289,7 +299,7 @@ int ASYNC_pause_job(void)
     job = async_get_ctx()->currjob;
     job->status = ASYNC_JOB_PAUSING;
 
-    if(!async_fibre_swapcontext(&job->fibrectx,
+    if(!async_fibre_swapcontext(&job->fibre.fibrectx,
                                &async_get_ctx()->dispatcher, 1)) {
         ASYNCerr(ASYNC_F_ASYNC_PAUSE_JOB, ASYNC_R_FAILED_TO_SWAP_CONTEXT);
         return 0;
@@ -308,7 +318,17 @@ static void async_empty_pool(STACK_OF(ASYNC_JOB) *pool)
     } while (job);
 }
 
-int ASYNC_init_pool(size_t max_size, size_t init_size)
+int ASYNC_init_thread(ASYNC_METHOD *meth, size_t max_size, size_t init_size)
+{
+    if (meth == NULL)
+        async_set_meth(&async_default_method);
+    else
+        async_set_meth(meth);
+
+    return async_get_meth()->init_thread(max_size, init_size);
+}
+
+static int async_def_init_thread(size_t max_size, size_t init_size)
 {
     STACK_OF(ASYNC_JOB) *pool;
     size_t curr_size = 0;
@@ -328,7 +348,7 @@ int ASYNC_init_pool(size_t max_size, size_t init_size)
         ASYNC_JOB *job;
         job = async_job_new();
         if (job) {
-            async_fibre_makecontext(&job->fibrectx);
+            async_fibre_makecontext(&job->fibre.fibrectx);
             job->funcargs = NULL;
             sk_ASYNC_JOB_push(pool, job);
             curr_size++;
@@ -352,7 +372,12 @@ int ASYNC_init_pool(size_t max_size, size_t init_size)
     return 1;
 }
 
-void ASYNC_free_pool(void)
+void ASYNC_cleanup_thread(void)
+{
+    async_get_meth()->cleanup_thread();
+}
+
+static void async_def_cleanup_thread(void)
 {
     STACK_OF(ASYNC_JOB) *pool;
 
@@ -367,6 +392,11 @@ void ASYNC_free_pool(void)
 
 ASYNC_JOB *ASYNC_get_current_job(void)
 {
+    return async_get_meth()->get_current_job();
+}
+
+static ASYNC_JOB *async_def_get_current_job(void)
+{
     async_ctx *ctx;
     if((ctx = async_get_ctx()) == NULL)
         return NULL;
@@ -376,10 +406,20 @@ ASYNC_JOB *ASYNC_get_current_job(void)
 
 int ASYNC_get_wait_fd(ASYNC_JOB *job)
 {
+    return async_get_meth()->get_wait_fd(job);
+}
+
+static int async_def_get_wait_fd(ASYNC_JOB *job)
+{
     return job->wait_fd;
 }
 
 void ASYNC_wake(ASYNC_JOB *job)
+{
+    async_get_meth()->wake(job);
+}
+
+static void async_def_wake(ASYNC_JOB *job)
 {
     char dummy = 0;
 
@@ -391,9 +431,57 @@ void ASYNC_wake(ASYNC_JOB *job)
 
 void ASYNC_clear_wake(ASYNC_JOB *job)
 {
+    async_get_meth()->clear_wake(job);
+}
+
+static void async_def_clear_wake(ASYNC_JOB *job)
+{
     char dummy = 0;
     if (!job->wake_set)
         return;
     async_read1(job->wait_fd, &dummy);
     job->wake_set = 0;
 }
+
+void *ASYNC_get_custom_fibre(ASYNC_JOB *job)
+{
+    return job->fibre.customfibre;
+}
+
+void ASYNC_set_custom_fibre(ASYNC_JOB *job, void *fibre)
+{
+    job->fibre.customfibre = fibre;
+}
+
+void ASYNC_get_func(ASYNC_JOB *job, int (**func) (void *), void **funcargs)
+{
+    *func = job->func;
+    *funcargs = job->funcargs;
+}
+
+void ASYNC_set_func(ASYNC_JOB *job, int (*func) (void *), void *funcargs)
+{
+    job->func = func;
+    job->funcargs = funcargs;
+}
+
+int ASYNC_get_ret(ASYNC_JOB *job)
+{
+    return job->ret;
+}
+
+void ASYNC_set_ret(ASYNC_JOB *job, int ret)
+{
+    job->ret = ret;
+}
+
+ASYNC_METHOD async_default_method = {
+    async_def_init_thread,
+    async_def_cleanup_thread,
+    async_def_start_job,
+    async_def_pause_job,
+    async_def_get_wait_fd,
+    async_def_get_current_job,
+    async_def_wake,
+    async_def_clear_wake
+};

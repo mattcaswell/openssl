@@ -62,13 +62,31 @@ extern "C" {
 
 typedef struct async_job_st ASYNC_JOB;
 
+struct async_method_st {
+    int (*init_thread)(size_t max_size, size_t init_size);
+    void (*cleanup_thread)(void);
+    int (*start_job)(ASYNC_JOB **job, int *ret, int (*func)(void *),
+                             void *args, size_t size);
+    int (*pause_job)(void);
+
+    int (*get_wait_fd)(ASYNC_JOB *job);
+    ASYNC_JOB *(*get_current_job)(void);
+    void (*wake)(ASYNC_JOB *job);
+    void (*clear_wake)(ASYNC_JOB *job);
+};
+
+typedef struct async_method_st ASYNC_METHOD;
+
+extern ASYNC_METHOD async_default_method;
+
+
 #define ASYNC_ERR      0
 #define ASYNC_NO_JOBS  1
 #define ASYNC_PAUSE    2
 #define ASYNC_FINISH   3
 
-int ASYNC_init_pool(size_t max_size, size_t init_size);
-void ASYNC_free_pool(void);
+int ASYNC_init_thread(ASYNC_METHOD *meth, size_t max_size, size_t init_size);
+void ASYNC_cleanup_thread(void);
 
 int ASYNC_start_job(ASYNC_JOB **job, int *ret, int (*func)(void *),
                          void *args, size_t size);
@@ -78,6 +96,17 @@ int ASYNC_get_wait_fd(ASYNC_JOB *job);
 ASYNC_JOB *ASYNC_get_current_job(void);
 void ASYNC_wake(ASYNC_JOB *job);
 void ASYNC_clear_wake(ASYNC_JOB *job);
+
+/*
+ * ASYNC_JOB accessor functions. Typically only useful for ASYNC_METHOD
+ * implementations - not applications.
+ */
+void *ASYNC_get_custom_fibre(ASYNC_JOB *job);
+void ASYNC_set_custom_fibre(ASYNC_JOB *job, void *fibre);
+void ASYNC_get_func(ASYNC_JOB *job, int (**func) (void *), void **funcargs);
+void ASYNC_set_func(ASYNC_JOB *job, int (*func) (void *), void *funcargs);
+int ASYNC_get_ret(ASYNC_JOB *job);
+void ASYNC_set_ret(ASYNC_JOB *job, int ret);    
 
 /* BEGIN ERROR CODES */
 /*

@@ -66,6 +66,7 @@
 #  include "e_os.h"
 
 extern __thread async_ctx *sysvctx;
+extern __thread ASYNC_METHOD *async_posixmethod;
 
 typedef struct async_fibre_st {
     ucontext_t fibre;
@@ -75,6 +76,8 @@ typedef struct async_fibre_st {
 
 #  define async_set_ctx(nctx)             (sysvctx = (nctx))
 #  define async_get_ctx()                 (sysvctx)
+#  define async_set_meth(m)               (async_posixmethod = (m))
+#  define async_get_meth()                (async_posixmethod)
 
 static inline int async_fibre_swapcontext(async_fibre *o, async_fibre *n, int r)
 {

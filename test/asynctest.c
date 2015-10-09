@@ -114,12 +114,12 @@ static int wake(void *args)
     return 1;
 }
 
-static int test_ASYNC_init_pool()
+static int test_ASYNC_init_thread()
 {
     ASYNC_JOB *job1 = NULL, *job2 = NULL, *job3 = NULL;
     int funcret1, funcret2, funcret3;
 
-    if (       !ASYNC_init_pool(2, 0)
+    if (       !ASYNC_init_thread(NULL, 2, 0)
             || ASYNC_start_job(&job1, &funcret1, only_pause, NULL, 0)
                 != ASYNC_PAUSE
             || ASYNC_start_job(&job2, &funcret2, only_pause, NULL, 0)
@@ -137,12 +137,12 @@ static int test_ASYNC_init_pool()
             || funcret1 != 1
             || funcret2 != 1
             || funcret3 != 1) {
-        fprintf(stderr, "test_ASYNC_init_pool() failed\n");
-        ASYNC_free_pool();
+        fprintf(stderr, "test_ASYNC_init_thread() failed\n");
+        ASYNC_cleanup_thread();
         return 0;
     }
 
-    ASYNC_free_pool();
+    ASYNC_cleanup_thread();
     return 1;
 }
 
@@ -153,18 +153,18 @@ static int test_ASYNC_start_job()
 
     ctr = 0;
 
-    if (       !ASYNC_init_pool(1, 0)
+    if (       !ASYNC_init_thread(NULL, 1, 0)
             || ASYNC_start_job(&job, &funcret, add_two, NULL, 0) != ASYNC_PAUSE
             || ctr != 1
             || ASYNC_start_job(&job, &funcret, add_two, NULL, 0) != ASYNC_FINISH
             || ctr != 2
             || funcret != 2) {
         fprintf(stderr, "test_ASYNC_start_job() failed\n");
-        ASYNC_free_pool();
+        ASYNC_cleanup_thread();
         return 0;
     }
 
-    ASYNC_free_pool();
+    ASYNC_cleanup_thread();
     return 1;
 }
 
@@ -175,7 +175,7 @@ static int test_ASYNC_get_current_job()
 
     currjob = NULL;
 
-    if (       !ASYNC_init_pool(1, 0)
+    if (       !ASYNC_init_thread(NULL, 1, 0)
             || ASYNC_start_job(&job, &funcret, save_current, NULL, 0)
                 != ASYNC_PAUSE
             || currjob != job
@@ -183,11 +183,11 @@ static int test_ASYNC_get_current_job()
                 != ASYNC_FINISH
             || funcret != 1) {
         fprintf(stderr, "test_ASYNC_get_current_job() failed\n");
-        ASYNC_free_pool();
+        ASYNC_cleanup_thread();
         return 0;
     }
 
-    ASYNC_free_pool();
+    ASYNC_cleanup_thread();
     return 1;
 }
 
@@ -212,7 +212,7 @@ static int test_ASYNC_get_wait_fd()
 
     currjob = NULL;
 
-    if (       !ASYNC_init_pool(1, 0)
+    if (       !ASYNC_init_thread(NULL, 1, 0)
             || ASYNC_start_job(&job, &funcret, wake, NULL, 0)
                 != ASYNC_PAUSE
             || (fd = ASYNC_get_wait_fd(job)) < 0
@@ -228,11 +228,11 @@ static int test_ASYNC_get_wait_fd()
                 != ASYNC_FINISH
             || funcret != 1) {
         fprintf(stderr, "test_ASYNC_get_wait_fd() failed\n");
-        ASYNC_free_pool();
+        ASYNC_cleanup_thread();
         return 0;
     }
 
-    ASYNC_free_pool();
+    ASYNC_cleanup_thread();
     return 1;
 }
 #endif
@@ -247,7 +247,7 @@ int main(int argc, char **argv)
     CRYPTO_set_mem_debug_options(V_CRYPTO_MDEBUG_ALL);
     CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
 
-    if (       !test_ASYNC_init_pool()
+    if (       !test_ASYNC_init_thread()
             || !test_ASYNC_start_job()
             || !test_ASYNC_get_current_job()
             || !test_ASYNC_get_wait_fd()) {

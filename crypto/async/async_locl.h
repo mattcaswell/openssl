@@ -66,7 +66,10 @@ struct async_ctx_st {
 };
 
 struct async_job_st {
-    async_fibre fibrectx;
+    union {
+        async_fibre fibrectx;
+        void *customfibre;
+    } fibre;
     int (*func) (void *);
     void *funcargs;
     int ret;
