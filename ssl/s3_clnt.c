@@ -2967,10 +2967,10 @@ int ssl3_send_client_verify(SSL *s)
             if (pkey->type == NID_id_GostR3410_2001
                     || pkey->type == NID_id_GostR3410_2012_256
                     || pkey->type == NID_id_GostR3410_2012_512) {
-                int i, j; 
-                for (i = u - 1, j = 0; j < u/2; j++, i--) {
-                    char c = p[2 + j];
-                    p[2 + j] = p[2 + i];
+                unsigned int i, k; 
+                for (i = u - 1, k = 0; k < u/2; k++, i--) {
+                    char c = p[2 + k];
+                    p[2 + k] = p[2 + i];
                     p[2 + i] = c;
                 }
             }
