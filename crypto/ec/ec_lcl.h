@@ -297,6 +297,8 @@ struct ec_key_st {
     EC_GROUP *group;
     EC_POINT *pub_key;
     BIGNUM *priv_key;
+    /* Alternative private key data if "priv_key" is inappropriate */
+    void *other;
     unsigned int enc_flag;
     point_conversion_form_t conv_form;
     int references;
@@ -316,6 +318,8 @@ struct ec_point_st {
                                  * Z) represents (X/Z^2, Y/Z^3) if Z != 0 */
     int Z_is_one;               /* enable optimized point arithmetics for
                                  * special case */
+    /* Alternative point data if other fields are inappropriate */
+    void *other;
 } /* EC_POINT */ ;
 
 NISTP224_PRE_COMP *EC_nistp224_pre_comp_dup(NISTP224_PRE_COMP *);
