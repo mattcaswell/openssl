@@ -223,6 +223,7 @@ typedef struct {
 
 # define TLS_CURVE_CHAR2         0x1
 # define TLS_CURVE_PRIME         0x0
+# define TLS_CURVE_CUSTOM        0x2
 
 static const tls_curve_info nid_list[] = {
     {NID_sect163k1, 80, TLS_CURVE_CHAR2}, /* sect163k1 (1) */
@@ -253,6 +254,7 @@ static const tls_curve_info nid_list[] = {
     {NID_brainpoolP256r1, 128, TLS_CURVE_PRIME}, /* brainpoolP256r1 (26) */
     {NID_brainpoolP384r1, 192, TLS_CURVE_PRIME}, /* brainpoolP384r1 (27) */
     {NID_brainpoolP512r1, 256, TLS_CURVE_PRIME}, /* brainpool512r1 (28) */
+    {NID_Curve25519, 128, TLS_CURVE_CUSTOM}, /* Curve25519 (29) */
 };
 
 static const unsigned char ecformats_default[] = {
@@ -263,6 +265,7 @@ static const unsigned char ecformats_default[] = {
 
 /* The default curves */
 static const unsigned char eccurves_default[] = {
+    0, 29,                      /* Curve25519 (29) */
     /* Prefer P-256 which has the fastest and most secure implementations. */
     0, 23,                      /* secp256r1 (23) */
     /* Other >= 256-bit prime curves. */
@@ -393,6 +396,8 @@ int tls1_ec_nid2curve_id(int nid)
         return 27;
     case NID_brainpoolP512r1:  /* brainpool512r1 (28) */
         return 28;
+    case NID_Curve25519:       /* Curve25519 (29) */
+        return 29;
     default:
         return 0;
     }
