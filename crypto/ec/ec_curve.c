@@ -3020,6 +3020,8 @@ static const ec_list_element curve_list[] = {
      "RFC 5639 curve over a 512 bit prime field"},
     {NID_brainpoolP512t1, &_EC_brainpoolP512t1.h, 0,
      "RFC 5639 curve over a 512 bit prime field"},
+    {NID_Curve25519, NULL, ec_curve25519_meth,
+     "Curve 25519"},
 };
 
 #define curve_list_length OSSL_NELEM(curve_list)
