@@ -643,3 +643,5 @@ int ossl_ecdsa_verify(int type, const unsigned char *dgst, int dgst_len,
                       const unsigned char *sigbuf, int sig_len, EC_KEY *eckey);
 int ossl_ecdsa_verify_sig(const unsigned char *dgst, int dgst_len,
                           const ECDSA_SIG *sig, EC_KEY *eckey);
+
+const EC_METHOD *ec_curve25519_meth(void);
