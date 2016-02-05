@@ -1402,6 +1402,8 @@ static void internal_curve_test(void)
     for (n = 0; n < crv_len; n++) {
         EC_GROUP *group = NULL;
         int nid = curves[n].nid;
+        if (nid == NID_Curve25519)
+            continue;
         fprintf(stdout, "%s:\n", OBJ_nid2sn(nid));
         fflush(stdout);
         if ((group = EC_GROUP_new_by_curve_name(nid)) == NULL) {

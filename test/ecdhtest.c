@@ -493,6 +493,8 @@ int main(int argc, char *argv[])
     /* NAMED CURVES TESTS */
     for (n = 0; n < crv_len; n++) {
         nid = curves[n].nid;
+        if (nid == NID_Curve25519)
+            continue;
         if (!test_ecdh_curve(nid, ctx, out)) goto err;
     }
 
