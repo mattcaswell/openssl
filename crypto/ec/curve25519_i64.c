@@ -5,7 +5,8 @@
  * Based on work by Daniel J Bernstein, http://cr.yp.to/ecdh.html
  */
 
-#include <stdint.h>
+#include <string.h>
+#include "ec_lcl.h"
 #include "curve25519_i64.h"
 
 
@@ -57,7 +58,7 @@ static void cpy32(k25519 d, const k25519 s) {
 /* p[m..n+m-1] = q[m..n+m-1] + z * x */
 /* n is the size of x */
 /* n+m is the size of p and q */
-static inline
+static ossl_inline
 int mula_small(dstptr p, srcptr q, unsigned m, srcptr x, unsigned n, int z) {
 	int v = 0;
 	unsigned i;
@@ -105,7 +106,7 @@ static void divmod(dstptr q, dstptr r, unsigned n, srcptr d, unsigned t) {
 	r[t-1] = rn;
 }
 
-static inline unsigned numsize(srcptr x, unsigned n) {
+static ossl_inline unsigned numsize(srcptr x, unsigned n) {
 	while (n-- && !x[n])
 		;
 	return n+1;
@@ -197,7 +198,7 @@ static void unpack25519(i25519 x, const k25519 m) {
 
 
 /* Check if reduced-form input >= 2^255-19 */
-static inline int is_overflow(const i25519 x) {
+static ossl_inline int is_overflow(const i25519 x) {
 	return ((x[0] > P26-19) & ((x[1] & x[3] & x[5] & x[7] & x[9]) == P25) &
 	                          ((x[2] & x[4] & x[6] & x[8]) == P26)
 	       ) | (x[9] > P25);
@@ -481,7 +482,7 @@ static void recip25519(i25519 y, const i25519 x, int sqrtassist) {
 }
 
 /* checks if x is "negative", requires reduced input */
-static inline int is_negative(i25519 x) {
+static ossl_inline int is_negative(i25519 x) {
 	return (is_overflow(x) | (x[9] < 0)) ^ (x[0] & 1);
 }
 
@@ -505,7 +506,7 @@ static void sqrt25519(i25519 x, const i25519 u) {
 
 /* t1 = ax + az
  * t2 = ax - az  */
-static inline void mont_prep(i25519 t1, i25519 t2, i25519 ax, i25519 az) {
+static ossl_inline void mont_prep(i25519 t1, i25519 t2, i25519 ax, i25519 az) {
 	add25519(t1, ax, az);
 	sub25519(t2, ax, az);
 }
@@ -516,7 +517,7 @@ static inline void mont_prep(i25519 t1, i25519 t2, i25519 ax, i25519 az) {
  *  X(Q) = (t3+t4)/(t3-t4)
  *  X(P-Q) = dx
  * clobbers t1 and t2, preserves t3 and t4  */
-static inline void mont_add(i25519 t1, i25519 t2, i25519 t3, i25519 t4,
+static ossl_inline void mont_add(i25519 t1, i25519 t2, i25519 t3, i25519 t4,
 			i25519 ax, i25519 az, const i25519 dx) {
 	mul25519(ax, t2, t3);
 	mul25519(az, t1, t4);
@@ -531,7 +532,7 @@ static inline void mont_add(i25519 t1, i25519 t2, i25519 t3, i25519 t4,
  *  X(B) = bx/bz
  *  X(Q) = (t3+t4)/(t3-t4)
  * clobbers t1 and t2, preserves t3 and t4  */
-static inline void mont_dbl(i25519 t1, i25519 t2, i25519 t3, i25519 t4,
+static ossl_inline void mont_dbl(i25519 t1, i25519 t2, i25519 t3, i25519 t4,
 			i25519 bx, i25519 bz) {
 	sqr25519(t1, t3);
 	sqr25519(t2, t4);
@@ -544,7 +545,7 @@ static inline void mont_dbl(i25519 t1, i25519 t2, i25519 t3, i25519 t4,
 
 /* Y^2 = X^3 + 486662 X^2 + X
  * t is a temporary  */
-static inline void x_to_y2(i25519 t, i25519 y2, const i25519 x) {
+static ossl_inline void x_to_y2(i25519 t, i25519 y2, const i25519 x) {
 	sqr25519(t, x);
 	mul25519small(y2, x, 486662);
 	add25519(t, t, y2);
@@ -553,9 +554,14 @@ static inline void x_to_y2(i25519 t, i25519 y2, const i25519 x) {
 }
 
 /* P = kG   and  s = sign(P)/k  */
-void core25519(k25519 Px, k25519 s, const k25519 k, const k25519 Gx) {
+void core25519(k25519 Px, k25519 s, const k25519 kx, const k25519 Gx) {
 	i25519 dx, x[2], z[2], t1, t2, t3, t4;
 	unsigned i, j;
+
+    /* Copy supplied key and clamp it */
+    k25519 k;
+    memcpy(k, kx, sizeof(k));
+    clamp25519(k);
 
 	/* unpack the base */
 	if (Gx)

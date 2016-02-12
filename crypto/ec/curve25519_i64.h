@@ -8,8 +8,6 @@
  * Based on work by Daniel J Bernstein, http://cr.yp.to/ecdh.html
  */
 
-#include <stddef.h>
-
 typedef unsigned char k25519[32]; /* any type of key */
 
 extern const k25519 zero25519;	/* 0 */
@@ -34,7 +32,7 @@ void core25519(k25519 P, spriv25519 s, const priv25519 k, const k25519 G);
  *   k [out] your private key for key agreement
  *   k  [in]  32 random bytes
  */
-static inline
+static ossl_inline
 void clamp25519(priv25519 k) {
 	k[31] &= 0x7F;
 	k[31] |= 0x40;
@@ -50,7 +48,7 @@ void clamp25519(priv25519 k) {
  * s may be NULL if you don't care
  *
  * WARNING: if s is not NULL, this function has data-dependent timing */
-static inline
+static ossl_inline
 void keygen25519(pub25519 P, spriv25519 s, priv25519 k) {
 	clamp25519(k);
 	core25519(P, s, k, NULL);
@@ -62,7 +60,7 @@ void keygen25519(pub25519 P, spriv25519 s, priv25519 k) {
  *   k  [in]  your private key for key agreement
  *   P  [in]  peer's public key
  * Buffers may overlap.  */
-static inline
+static ossl_inline
 void curve25519(sec25519 Z, const priv25519 k, const pub25519 P) {
 	core25519(Z, NULL, k, P);
 }
