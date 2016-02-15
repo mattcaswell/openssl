@@ -65,7 +65,11 @@
 static void do_curve25519(uint8_t *output, const uint8_t *secret,
                           const uint8_t *bp)
 {
+#if 0
     curve25519(output, secret, bp);
+#endif
+    /* TODO: FIXME - Should take account of return code */
+    curve25519_impl(output, secret, bp);
 }
 
 /* Copy Curve25519 public or private key buffers, allocating is necessary */
