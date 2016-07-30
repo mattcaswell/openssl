@@ -147,7 +147,7 @@ sub start
                 or die "Failed to redirect stdout: $!";
             open(STDERR, ">&STDOUT");
         }
-        my $execcmd = $self->execute
+        my $execcmd = "echo; echo RUN ME FROM test DIR IN TERMINAL 2:; echo OPENSSL_ENGINES=../engines ".$self->execute
             ." s_server -no_comp -rev -engine ossltest -accept "
             .($self->server_port)
             ." -cert ".$self->cert." -naccept ".$self->serverconnects;
@@ -200,7 +200,7 @@ sub clientstart
                     or die "Failed to redirect stdout: $!";
                 open(STDERR, ">&STDOUT");
             }
-            my $execcmd = "echo test | ".$self->execute
+            my $execcmd = "echo RUN ME FROM test DIR IN TERMINAL 3:; echo echo test \\| OPENSSL_ENGINES=../engines ".$self->execute
                  ." s_client -engine ossltest -connect "
                  .($self->proxy_addr).":".($self->proxy_port);
             if ($self->cipherc ne "") {
