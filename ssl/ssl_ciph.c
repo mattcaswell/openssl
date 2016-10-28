@@ -859,6 +859,8 @@ static void ssl_cipher_apply_rule(uint32_t cipher_id, uint32_t alg_mkey,
                     cp->algorithm_enc, cp->algorithm_mac, cp->min_tls,
                     cp->algo_strength);
 #endif
+            if (cipher_id != 0 && (cipher_id != cp->id))
+                continue;
             if (alg_mkey && !(alg_mkey & cp->algorithm_mkey))
                 continue;
             if (alg_auth && !(alg_auth & cp->algorithm_auth))
@@ -1034,9 +1036,10 @@ static int ssl_cipher_process_rulestr(const char *rule_str,
             while (((ch >= 'A') && (ch <= 'Z')) ||
                    ((ch >= '0') && (ch <= '9')) ||
                    ((ch >= 'a') && (ch <= 'z')) ||
-                   (ch == '-') || (ch == '.') || (ch == '='))
+                   (ch == '-') || (ch == '.') || (ch == '=') || (ch == '_'))
 #else
-            while (isalnum(ch) || (ch == '-') || (ch == '.') || (ch == '='))
+            while (isalnum(ch) || (ch == '-') || (ch == '.') || (ch == '=')
+                   || (ch == '_'))
 #endif
             {
                 ch = *(++l);
