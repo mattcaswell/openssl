@@ -873,6 +873,10 @@ SSL_CTX_callback_ctrl(ssl,SSL_CTRL_SET_TLSEXT_TICKET_KEY_CB,(void (*)(void))cb)
 # define TLS1_TXT_RSA_PSK_WITH_CHACHA20_POLY1305           "RSA-PSK-CHACHA20-POLY1305"
 
 /* TLSv1.3 ciphersuites */
+/*
+ * TODO(TLS1.3): Review the naming scheme for TLSv1.3 ciphers and also the
+ * cipherstring selection process for these ciphers
+ */
 # define TLS1_3_TXT_AES_128_GCM_SHA256                     "TLS_AES_128_GCM_SHA256"
 
 # define TLS_CT_RSA_SIGN                 1
