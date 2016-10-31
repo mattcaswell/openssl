@@ -1049,7 +1049,7 @@ int ssl_choose_server_version(SSL *s, CLIENTHELLO_MSG *hello)
                 const SSL_METHOD *method;
 
                 method = vent->smeth();
-                if (ssl_method_error(s, method) == 0) {
+                if (method != NULL && ssl_method_error(s, method) == 0) {
                     best_vers = candidate_vers;
                     best_method = method;
                 }
