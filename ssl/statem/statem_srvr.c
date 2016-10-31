@@ -1036,10 +1036,7 @@ MSG_PROCESS_RETURN tls_process_client_hello(SSL *s, PACKET *pkt)
             goto f_err;
         }
 
-        if (!PACKET_get_length_prefixed_1(pkt, &compression)
-                || !PACKET_copy_all(&compression, clienthello.compressions,
-                               MAX_COMPRESSIONS_SIZE,
-                               &clienthello.compressions_len)) {
+        if (!PACKET_get_length_prefixed_1(pkt, &compression)) {
             al = SSL_AD_DECODE_ERROR;
             SSLerr(SSL_F_TLS_PROCESS_CLIENT_HELLO, SSL_R_LENGTH_MISMATCH);
             goto f_err;
@@ -1057,9 +1054,11 @@ MSG_PROCESS_RETURN tls_process_client_hello(SSL *s, PACKET *pkt)
         }
     }
 
-    if (!PACKET_copy_all(&session_id, clienthello.session_id,
-                         SSL_MAX_SSL_SESSION_ID_LENGTH,
-                         &clienthello.session_id_len)) {
+    if (!PACKET_copy_all(&compression, clienthello.compressions,
+                         MAX_COMPRESSIONS_SIZE, &clienthello.compressions_len)
+            || !PACKET_copy_all(&session_id, clienthello.session_id,
+                                SSL_MAX_SSL_SESSION_ID_LENGTH,
+                                &clienthello.session_id_len)) {
         al = SSL_AD_DECODE_ERROR;
         SSLerr(SSL_F_TLS_PROCESS_CLIENT_HELLO, SSL_R_LENGTH_MISMATCH);
         goto f_err;
