@@ -27,8 +27,8 @@ SOURCE[../libcrypto]=\
 # FIPS module
 SOURCE[../providers/fips]=\
         cryptlib.c mem.c params.c bsearch.c ex_data.c o_str.c \
-        ctype.c threads_pthread.c threads_win.c threads_none.c initthread.c \
-        context.c sparse_array.c {- $target{cpuid_asm_src} -}
+        ctype.c threads_pthread.c threads_win.c threads_none.c mem_sec.c \
+        initthread.c context.c sparse_array.c {- $target{cpuid_asm_src} -}
 
 
 DEPEND[cversion.o]=buildinf.h
