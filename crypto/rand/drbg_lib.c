@@ -1136,68 +1136,9 @@ err:
     return NULL;
 }
 
-<<<<<<< HEAD
 static void drbg_delete_thread_state(void *arg)
 {
     OPENSSL_CTX *ctx = arg;
-=======
-/*
- * Initialize the OPENSSL_CTX global DRBGs on first use.
- * Returns the allocated global data on success or NULL on failure.
- */
-static void *drbg_ossl_ctx_new(OPENSSL_CTX *libctx)
-{
-    DRBG_GLOBAL *dgbl = OPENSSL_zalloc(sizeof(*dgbl));
-
-    if (dgbl == NULL)
-        return NULL;
-
-    if (!CRYPTO_THREAD_init_local(&dgbl->private_drbg, NULL))
-        goto err1;
-
-    if (!CRYPTO_THREAD_init_local(&dgbl->public_drbg, NULL))
-        goto err2;
-
-    dgbl->master_drbg = drbg_setup(libctx, NULL, RAND_DRBG_TYPE_MASTER);
-    if (dgbl->master_drbg == NULL)
-        goto err3;
-
-    return dgbl;
-
- err3:
-    CRYPTO_THREAD_cleanup_local(&dgbl->public_drbg);
- err2:
-    CRYPTO_THREAD_cleanup_local(&dgbl->private_drbg);
- err1:
-    OPENSSL_free(dgbl);
-    return NULL;
-}
-
-static void drbg_ossl_ctx_free(void *vdgbl)
-{
-    DRBG_GLOBAL *dgbl = vdgbl;
-
-    RAND_DRBG_free(dgbl->master_drbg);
-    CRYPTO_THREAD_cleanup_local(&dgbl->private_drbg);
-    CRYPTO_THREAD_cleanup_local(&dgbl->public_drbg);
-
-    OPENSSL_free(dgbl);
-}
-
-static const OPENSSL_CTX_METHOD drbg_ossl_ctx_method = {
-    drbg_ossl_ctx_new,
-    drbg_ossl_ctx_free,
-};
-
-static DRBG_GLOBAL *drbg_get_global(OPENSSL_CTX *libctx)
-{
-    return openssl_ctx_get_data(libctx, OPENSSL_CTX_DRBG_INDEX,
-                                &drbg_ossl_ctx_method);
-}
-
-static void drbg_delete_thread_state(void *arg)
-{
->>>>>>> Convert drbg_lib to use OPENSSL_CTX for its global data
     DRBG_GLOBAL *dgbl = drbg_get_global(ctx);
     RAND_DRBG *drbg;
 
