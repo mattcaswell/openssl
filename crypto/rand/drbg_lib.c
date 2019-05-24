@@ -1137,7 +1137,7 @@ err:
     return NULL;
 }
 
-void drbg_delete_thread_state(void)
+static void drbg_delete_thread_state(OPENSSL_CTX *ctx)
 {
     /* TODO(3.0): Other PRs will pass the ctx as a param to this function */
     OPENSSL_CTX *ctx = NULL;
@@ -1332,7 +1332,7 @@ RAND_DRBG *OPENSSL_CTX_get0_public_drbg(OPENSSL_CTX *ctx)
 
     drbg = CRYPTO_THREAD_get_local(&dgbl->public_drbg);
     if (drbg == NULL) {
-        if (!ossl_init_thread_start(OPENSSL_INIT_THREAD_RAND))
+        if (!ossl_init_thread_start(NULL, drbg_delete_thread_state))
             return NULL;
         drbg = drbg_setup(ctx, dgbl->master_drbg, RAND_DRBG_TYPE_PUBLIC);
         CRYPTO_THREAD_set_local(&dgbl->public_drbg, drbg);
@@ -1359,7 +1359,7 @@ RAND_DRBG *OPENSSL_CTX_get0_private_drbg(OPENSSL_CTX *ctx)
 
     drbg = CRYPTO_THREAD_get_local(&dgbl->private_drbg);
     if (drbg == NULL) {
-        if (!ossl_init_thread_start(OPENSSL_INIT_THREAD_RAND))
+        if (!ossl_init_thread_start(NULL, drbg_delete_thread_state))
             return NULL;
         drbg = drbg_setup(ctx, dgbl->master_drbg, RAND_DRBG_TYPE_PRIVATE);
         CRYPTO_THREAD_set_local(&dgbl->private_drbg, drbg);
