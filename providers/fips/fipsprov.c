@@ -21,12 +21,43 @@
 #include "internal/property.h"
 #include "internal/evp_int.h"
 #include "internal/provider_algs.h"
+#include "internal/providercommon.h"
 
+/*
+ * TODO(3.0): Should these be stored in the provider side provctx? Could they
+ * ever be different from one init to the next? Unfortunately we can't do this
+ * at the moment because c_put_error/c_add_error_vdata do not provide us with
+ * the OPENSSL_CTX as a parameter.
+ */
 /* Functions provided by the core */
 static OSSL_core_get_param_types_fn *c_get_param_types = NULL;
 static OSSL_core_get_params_fn *c_get_params = NULL;
+extern OSSL_core_thread_start_fn *c_thread_start;
+OSSL_core_thread_start_fn *c_thread_start = NULL;
 static OSSL_core_put_error_fn *c_put_error = NULL;
 static OSSL_core_add_error_vdata_fn *c_add_error_vdata = NULL;
+
+typedef struct fips_global_st {
+    const OSSL_PROVIDER *prov;
+} FIPS_GLOBAL;
+
+static void *fips_prov_ossl_ctx_new(OPENSSL_CTX *libctx)
+{
+    FIPS_GLOBAL *fgbl = OPENSSL_zalloc(sizeof(*fgbl));
+
+    return fgbl;
+}
+
+static void fips_prov_ossl_ctx_free(void *fgbl)
+{
+    OPENSSL_free(fgbl);
+}
+
+static const OPENSSL_CTX_METHOD fips_prov_ossl_ctx_method = {
+    fips_prov_ossl_ctx_new,
+    fips_prov_ossl_ctx_free,
+};
+
 
 /* Parameters we provide to the core */
 static const OSSL_ITEM fips_param_types[] = {
@@ -163,7 +194,19 @@ int OSSL_provider_init(const OSSL_PROVIDER *provider,
                        const OSSL_DISPATCH **out,
                        void **provctx)
 {
-    OPENSSL_CTX *ctx;
+    FIPS_GLOBAL *fgbl;
+    OPENSSL_CTX *ctx = OPENSSL_CTX_new();
+
+    if (ctx == NULL)
+        return 0;
+
+    fgbl = openssl_ctx_get_data(ctx, OPENSSL_CTX_FIPS_PROV_INDEX,
+                                &fips_prov_ossl_ctx_method);
+
+    if (fgbl == NULL)
+        goto err;
+
+    fgbl->prov = provider;
 
     for (; in->function_id != 0; in++) {
         switch (in->function_id) {
@@ -172,6 +215,9 @@ int OSSL_provider_init(const OSSL_PROVIDER *provider,
             break;
         case OSSL_FUNC_CORE_GET_PARAMS:
             c_get_params = OSSL_get_core_get_params(in);
+            break;
+        case OSSL_FUNC_CORE_THREAD_START:
+            c_thread_start = OSSL_get_core_thread_start(in);
             break;
         case OSSL_FUNC_CORE_PUT_ERROR:
             c_put_error = OSSL_get_core_put_error(in);
@@ -185,22 +231,20 @@ int OSSL_provider_init(const OSSL_PROVIDER *provider,
         }
     }
 
-    ctx = OPENSSL_CTX_new();
-    if (ctx == NULL)
-        return 0;
-
     /*
      * TODO(3.0): Remove me. This is just a dummy call to demonstrate making
      * EVP calls from within the FIPS module.
      */
-    if (!dummy_evp_call(ctx)) {
-        OPENSSL_CTX_free(ctx);
-        return 0;
-    }
+    if (!dummy_evp_call(ctx))
+        goto err;
 
     *out = fips_dispatch_table;
     *provctx = ctx;
     return 1;
+
+ err:
+    OPENSSL_CTX_free(ctx);
+    return 0;
 }
 
 /*
@@ -246,4 +290,15 @@ void ERR_add_error_data(int num, ...)
 void ERR_add_error_vdata(int num, va_list args)
 {
     c_add_error_vdata(num, args);
+}
+
+const OSSL_PROVIDER *FIPS_get_provider(OPENSSL_CTX *ctx)
+{
+    FIPS_GLOBAL *fgbl = openssl_ctx_get_data(ctx, OPENSSL_CTX_FIPS_PROV_INDEX,
+                                             &fips_prov_ossl_ctx_method);
+
+    if (fgbl == NULL)
+        return NULL;
+
+    return fgbl->prov;
 }
