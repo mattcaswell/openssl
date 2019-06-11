@@ -45,16 +45,7 @@ static int bnrand(BNRAND_FLAG flag, BIGNUM *rnd, int bits, int top, int bottom)
     }
 
     /* make a random number and set the top and bottom bits */
-    /*
-     * TODO(3.0): Temporarily disable RAND code in the FIPS module until we
-     * have made it available there.
-     */
-#if defined(FIPS_MODE)
-    BNerr(BN_F_BNRAND, ERR_R_INTERNAL_ERROR);
-    goto err;
-#else
     b = flag == NORMAL ? RAND_bytes(buf, bytes) : RAND_priv_bytes(buf, bytes);
-#endif
     if (b <= 0)
         goto err;
 
@@ -66,14 +57,8 @@ static int bnrand(BNRAND_FLAG flag, BIGNUM *rnd, int bits, int top, int bottom)
         unsigned char c;
 
         for (i = 0; i < bytes; i++) {
-    /*
-     * TODO(3.0): Temporarily disable RAND code in the FIPS module until we
-     * have made it available there.
-     */
-#if !defined(FIPS_MODE)
             if (RAND_bytes(&c, 1) <= 0)
                 goto err;
-#endif
             if (c >= 128 && i > 0)
                 buf[i] = buf[i - 1];
             else if (c < 42)
@@ -238,15 +223,7 @@ int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
     int ret = 0;
     EVP_MD *md = NULL;
     OPENSSL_CTX *libctx = (ctx != NULL) ? bn_get_lib_ctx(ctx) : NULL;
-    /*
-     * TODO(3.0): Temporarily disable RAND code in the FIPS module until we
-     * have made it available there.
-     */
-#ifdef FIPS_MODE
-    RAND_DRBG *privdrbg = NULL;
-#else
     RAND_DRBG *privdrbg = OPENSSL_CTX_get0_private_drbg(libctx);
-#endif
 
     if (mdctx == NULL || privdrbg == NULL)
         goto err;
@@ -275,14 +252,8 @@ int BN_generate_dsa_nonce(BIGNUM *out, const BIGNUM *range,
         goto err;
     }
     for (done = 0; done < num_k_bytes;) {
-        /*
-         * TODO(3.0): Temporarily disable RAND code in the FIPS module until we
-         * have made it available there.
-         */
-#if !defined(FIPS_MODE)
         if (!RAND_DRBG_bytes(privdrbg, random_bytes, sizeof(random_bytes)))
             goto err;
-#endif
 
         if (!EVP_DigestInit_ex(mdctx, md, NULL)
                 || !EVP_DigestUpdate(mdctx, &done, sizeof(done))
