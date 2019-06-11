@@ -9,6 +9,8 @@
 
 /* EVP_MD_CTX related stuff */
 
+#include <openssl/core_numbers.h>
+
 struct evp_md_ctx_st {
     const EVP_MD *reqdigest;    /* The original requested digest */
     const EVP_MD *digest;
@@ -60,6 +62,20 @@ struct evp_kdf_ctx_st {
     EVP_KDF_IMPL *impl;          /* Algorithm-specific data */
 } /* EVP_KDF_CTX */ ;
 
+struct evp_exchange_st {
+    OSSL_PROVIDER *prov;
+    CRYPTO_REF_COUNT refcnt;
+    CRYPTO_RWLOCK *lock;
+
+    OSSL_OP_exchange_newctx_fn *newctx;
+    OSSL_OP_exchange_init_fn *init;
+    OSSL_OP_exchange_set_peer_fn *set_peer;
+    OSSL_OP_exchange_derive_fn *derive;
+    OSSL_OP_exchange_freectx_fn *freectx;
+    OSSL_OP_exchange_dupctx_fn *dupctx;
+} /* EVP_EXCHANGE */;
+
+
 int PKCS5_v2_PBKDF2_keyivgen(EVP_CIPHER_CTX *ctx, const char *pass,
                              int passlen, ASN1_TYPE *param,
                              const EVP_CIPHER *c, const EVP_MD *md,
@@ -95,3 +111,23 @@ void *evp_generic_fetch(OPENSSL_CTX *ctx, int operation_id,
                                             OSSL_PROVIDER *prov),
                         int (*upref_method)(void *),
                         void (*free_method)(void *));
+
+OSSL_PARAM *evp_pkey_to_param(EVP_PKEY *pkey, size_t *sz);
+
+#define M_check_autoarg(ctx, arg, arglen, err) \
+    if (ctx->pmeth->flags & EVP_PKEY_FLAG_AUTOARGLEN) {           \
+        size_t pksize = (size_t)EVP_PKEY_size(ctx->pkey);         \
+                                                                  \
+        if (pksize == 0) {                                        \
+            EVPerr(err, EVP_R_INVALID_KEY); /*ckerr_ignore*/      \
+            return 0;                                             \
+        }                                                         \
+        if (arg == NULL) {                                        \
+            *arglen = pksize;                                     \
+            return 1;                                             \
+        }                                                         \
+        if (*arglen < pksize) {                                   \
+            EVPerr(err, EVP_R_BUFFER_TOO_SMALL); /*ckerr_ignore*/ \
+            return 0;                                             \
+        }                                                         \
+    }

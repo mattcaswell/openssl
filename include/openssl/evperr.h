@@ -68,6 +68,7 @@ int ERR_load_EVP_strings(void);
 # define EVP_F_EVP_ENCRYPTDECRYPTUPDATE                   219
 # define EVP_F_EVP_ENCRYPTFINAL_EX                        127
 # define EVP_F_EVP_ENCRYPTUPDATE                          167
+# define EVP_F_EVP_EXCHANGE_FROM_DISPATCH                 242
 # define EVP_F_EVP_KDF_CTRL                               224
 # define EVP_F_EVP_KDF_CTRL_STR                           225
 # define EVP_F_EVP_KDF_CTX_NEW                            240
@@ -99,6 +100,7 @@ int ERR_load_EVP_strings(void);
 # define EVP_F_EVP_PKEY_DECRYPT_OLD                       151
 # define EVP_F_EVP_PKEY_DERIVE                            153
 # define EVP_F_EVP_PKEY_DERIVE_INIT                       154
+# define EVP_F_EVP_PKEY_DERIVE_INIT_EX                    243
 # define EVP_F_EVP_PKEY_DERIVE_SET_PEER                   155
 # define EVP_F_EVP_PKEY_ENCRYPT                           105
 # define EVP_F_EVP_PKEY_ENCRYPT_INIT                      139

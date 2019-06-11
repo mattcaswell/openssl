@@ -374,7 +374,7 @@ Result = KEYOP_ERROR
 # Illegal RSA key derivation
 Derive = RSA-2048
 Result = KEYOP_INIT_ERROR
-Function = EVP_PKEY_derive_init
+Function = EVP_PKEY_derive_init_ex
 Reason = operation not supported for this keytype
 
 Sign = RSA-2048

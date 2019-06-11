@@ -24,7 +24,7 @@ int DH_set_method(DH *dh, const DH_METHOD *meth)
     mtmp = dh->meth;
     if (mtmp->finish)
         mtmp->finish(dh);
-#ifndef OPENSSL_NO_ENGINE
+#if !defined(OPENSSL_NO_ENGINE) && !defined(FIPS_MODE)
     ENGINE_finish(dh->engine);
     dh->engine = NULL;
 #endif
@@ -57,7 +57,7 @@ DH *DH_new_method(ENGINE *engine)
     }
 
     ret->meth = DH_get_default_method();
-#ifndef OPENSSL_NO_ENGINE
+#if !defined(OPENSSL_NO_ENGINE) && !defined(FIPS_MODE)
     ret->flags = ret->meth->flags;  /* early default init */
     if (engine) {
         if (!ENGINE_init(engine)) {
@@ -108,7 +108,7 @@ void DH_free(DH *r)
 
     if (r->meth != NULL && r->meth->finish != NULL)
         r->meth->finish(r);
-#ifndef OPENSSL_NO_ENGINE
+#if !defined(OPENSSL_NO_ENGINE) && !defined(FIPS_MODE)
     ENGINE_finish(r->engine);
 #endif
 

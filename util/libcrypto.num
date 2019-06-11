@@ -4832,3 +4832,8 @@ OPENSSL_CTX_get0_private_drbg           4776	3_0_0	EXIST::FUNCTION:
 OPENSSL_thread_stop_ex                  4777	3_0_0	EXIST::FUNCTION:
 BN_CTX_new_ex                           4778	3_0_0	EXIST::FUNCTION:
 BN_CTX_secure_new_ex                    4779	3_0_0	EXIST::FUNCTION:
+EVP_EXCHANGE_free                       4780	3_0_0	EXIST::FUNCTION:
+EVP_EXCHANGE_upref                      4781	3_0_0	NOEXIST::FUNCTION:
+EVP_EXCHANGE_fetch                      4782	3_0_0	EXIST::FUNCTION:
+EVP_PKEY_derive_init_ex                 4783	3_0_0	EXIST::FUNCTION:
+EVP_EXCHANGE_up_ref                     4784	3_0_0	EXIST::FUNCTION:
