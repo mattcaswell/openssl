@@ -86,6 +86,8 @@ static int dummy_evp_call(OPENSSL_CTX *libctx)
     int ret = 0;
     unsigned char randbuf[128];
     RAND_DRBG *drbg = OPENSSL_CTX_get0_public_drbg(libctx);
+    BN_CTX *bnctx = NULL;
+    BIGNUM *a = NULL, *b = NULL;
 
     if (ctx == NULL || sha256 == NULL || drbg == NULL)
         goto err;
@@ -102,8 +104,25 @@ static int dummy_evp_call(OPENSSL_CTX *libctx)
     if (RAND_DRBG_bytes(drbg, randbuf, sizeof(randbuf)) <= 0)
         goto err;
 
+    bnctx = BN_CTX_new_ex(libctx);
+    if (bnctx == NULL)
+        goto err;
+    BN_CTX_start(bnctx);
+    a = BN_CTX_get(bnctx);
+    b = BN_CTX_get(bnctx);
+    if (b == NULL)
+        goto err;
+    BN_zero(a);
+    if (!BN_one(b)
+        || !BN_add(a, a, b)
+        || BN_cmp(a, b) != 0)
+        goto err;
+
     ret = 1;
  err:
+    BN_CTX_end(bnctx);
+    BN_CTX_free(bnctx);
+    
     EVP_MD_CTX_free(ctx);
     EVP_MD_meth_free(sha256);
     return ret;
