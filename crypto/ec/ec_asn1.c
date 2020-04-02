@@ -1285,40 +1285,44 @@ ECDSA_SIG *d2i_ECDSA_SIG(ECDSA_SIG **psig, const unsigned char **ppin, long len)
 
 int i2d_ECDSA_SIG(const ECDSA_SIG *sig, unsigned char **ppout)
 {
-    BUF_MEM *buf = NULL;
-    size_t encoded_len;
+    size_t encoded_len = 0;
     WPACKET pkt;
+    unsigned char *out = NULL;
+    int i = 0;
 
-    if (ppout == NULL) {
-        if (!WPACKET_init_null(&pkt, 0))
-            return -1;
-    } else if (*ppout == NULL) {
-        if ((buf = BUF_MEM_new()) == NULL
-                || !WPACKET_init_len(&pkt, buf, 0)) {
-            BUF_MEM_free(buf);
+    do {
+        if (i == 0) {
+            if (!WPACKET_init_null_der(&pkt))
+                return -1;
+        } else {
+            if (!WPACKET_init_der(&pkt, out, encoded_len))
+                return -1;
+        }
+
+        if (!encode_der_dsa_sig(&pkt, sig->r, sig->s)
+                || !WPACKET_get_total_written(&pkt, &encoded_len)
+                || !WPACKET_finish(&pkt)) {
+            WPACKET_cleanup(&pkt);
             return -1;
         }
-    } else {
-        if (!WPACKET_init_static_len(&pkt, *ppout, SIZE_MAX, 0))
-            return -1;
-    }
 
-    if (!encode_der_dsa_sig(&pkt, sig->r, sig->s)
-            || !WPACKET_get_total_written(&pkt, &encoded_len)
-            || !WPACKET_finish(&pkt)) {
-        BUF_MEM_free(buf);
-        WPACKET_cleanup(&pkt);
-        return -1;
-    }
+        if (ppout != NULL && i == 0) {
+            if (*ppout != NULL) {
+                out = *ppout;
+            } else {
+                out = OPENSSL_malloc(encoded_len);
+                if (out == NULL)
+                    return -1;
+            }
+        }
+        i++;
+    } while (i < 2 && ppout != NULL);
 
     if (ppout != NULL) {
-        if (*ppout == NULL) {
-            *ppout = (unsigned char *)buf->data;
-            buf->data = NULL;
-            BUF_MEM_free(buf);
-        } else {
+        if (*ppout != NULL)
             *ppout += encoded_len;
-        }
+        else
+            *ppout = out;
     }
 
     return (int)encoded_len;

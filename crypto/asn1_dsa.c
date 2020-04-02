@@ -30,33 +30,6 @@
 #define ID_INTEGER 0x02
 
 /*
- * Outputs the encoding of the length octets for a DER value with a content
- * length of cont_len bytes to pkt. The maximum supported content length is
- * 65535 (0xffff) bytes.
- *
- * Returns 1 on success or 0 on error.
- */
-int encode_der_length(WPACKET *pkt, size_t cont_len)
-{
-    if (cont_len > 0xffff)
-        return 0; /* Too large for supported length encodings */
-
-    if (cont_len > 0xff) {
-        if (!WPACKET_put_bytes_u8(pkt, 0x82)
-                || !WPACKET_put_bytes_u16(pkt, cont_len))
-            return 0;
-    } else {
-        if (cont_len > 0x7f
-                && !WPACKET_put_bytes_u8(pkt, 0x81))
-            return 0;
-        if (!WPACKET_put_bytes_u8(pkt, cont_len))
-            return 0;
-    }
-
-    return 1;
-}
-
-/*
  * Outputs the DER encoding of a positive ASN.1 INTEGER to pkt.
  *
  * Results in an error if n is negative or too large.
@@ -83,14 +56,24 @@ int encode_der_integer(WPACKET *pkt, const BIGNUM *n)
     cont_len = BN_num_bits(n) / 8 + 1;
 
     if (!WPACKET_start_sub_packet(pkt)
-            || !WPACKET_put_bytes_u8(pkt, ID_INTEGER)
-            || !encode_der_length(pkt, cont_len)
             || !WPACKET_allocate_bytes(pkt, cont_len, &bnbytes)
-            || !WPACKET_close(pkt))
+            || !WPACKET_close(pkt)
+            || !WPACKET_put_bytes_u8(pkt, ID_INTEGER))
         return 0;
 
     if (bnbytes != NULL
             && BN_bn2binpad(n, bnbytes, (int)cont_len) != (int)cont_len)
+        return 0;
+
+    return 1;
+}
+
+#define encode_der_start_sequence(pkt) WPACKET_start_sub_packet(pkt)
+
+static int encode_der_end_sequence(WPACKET *pkt)
+{
+    if (!WPACKET_close(pkt)
+            || !WPACKET_put_bytes_u8(pkt, ID_SEQUENCE))
         return 0;
 
     return 1;
@@ -105,42 +88,10 @@ int encode_der_integer(WPACKET *pkt, const BIGNUM *n)
  */
 int encode_der_dsa_sig(WPACKET *pkt, const BIGNUM *r, const BIGNUM *s)
 {
-    WPACKET tmppkt, *dummypkt;
-    size_t cont_len;
-    int isnull = WPACKET_is_null_buf(pkt);
-
-    if (!WPACKET_start_sub_packet(pkt))
-        return 0;
-
-    if (!isnull) {
-        if (!WPACKET_init_null(&tmppkt, 0))
-            return 0;
-        dummypkt = &tmppkt;
-    } else {
-        /* If the input packet has a NULL buffer, we don't need a dummy packet */
-        dummypkt = pkt;
-    }
-
-    /* Calculate the content length */
-    if (!encode_der_integer(dummypkt, r)
-            || !encode_der_integer(dummypkt, s)
-            || !WPACKET_get_length(dummypkt, &cont_len)
-            || (!isnull && !WPACKET_finish(dummypkt))) {
-        if (!isnull)
-            WPACKET_cleanup(dummypkt);
-        return 0;
-    }
-
-    /* Add the tag and length bytes */
-    if (!WPACKET_put_bytes_u8(pkt, ID_SEQUENCE)
-            || !encode_der_length(pkt, cont_len)
-               /*
-                * Really encode the integers. We already wrote to the main pkt
-                * if it had a NULL buffer, so don't do it again
-                */
-            || (!isnull && !encode_der_integer(pkt, r))
-            || (!isnull && !encode_der_integer(pkt, s))
-            || !WPACKET_close(pkt))
+    if (!encode_der_start_sequence(pkt)
+            || !encode_der_integer(pkt, s)
+            || !encode_der_integer(pkt, r)
+            || !encode_der_end_sequence(pkt))
         return 0;
 
     return 1;
