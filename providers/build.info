@@ -56,11 +56,12 @@ DEFINE[$LIBFIPS]=FIPS_MODE
 # We make it weak so they aren't both used always; what is
 # actually used is determined by non-weak dependencies.
 DEPEND[$LIBIMPLEMENTATIONS]{weak}=$LIBFIPS $LIBNONFIPS
-DEPEND[$LIBCOMMON]{weak}=$LIBFIPS
 
 # Strong dependencies.  This ensures that any time libimplementations
 # is used, libcommon gets included as well.
 DEPEND[$LIBIMPLEMENTATIONS]=$LIBCOMMON
+DEPEND[$LIBNONFIPS]=$LIBCOMMON
+DEPEND[$LIBFIPS]=$LIBCOMMON
 DEPEND[$LIBNONFIPS]=../libcrypto
 # It's tempting to make libcommon depend on ../libcrypto.  However,
 # since the FIPS provider module must NOT depend on ../libcrypto, we
