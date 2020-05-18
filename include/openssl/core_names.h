@@ -364,6 +364,19 @@ extern "C" {
 #define OSSL_GEN_PARAM_POTENTIAL            "potential" /* integer */
 #define OSSL_GEN_PARAM_ITERATION            "iteration" /* integer */
 
+/* Capabilities */
+
+/* TLS-GROUP Capbility */
+#define OSSL_CAPABILITY_TLS_GROUP_NAME              "tls-group-name"
+#define OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL     "tls-group-name-internal"
+#define OSSL_CAPABILITY_TLS_GROUP_ID                "tls-group-id"
+#define OSSL_CAPABILITY_TLS_GROUP_ALG               "tls-group-alg"
+#define OSSL_CAPABILITY_TLS_GROUP_SECURITY_BITS     "tls-group-sec-bits"
+#define OSSL_CAPABILITY_TLS_GROUP_MIN_TLS           "tls-min-tls"
+#define OSSL_CAPABILITY_TLS_GROUP_MAX_TLS           "tls-max-tls"
+#define OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS          "tls-min-dtls"
+#define OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS          "tls-max-dtls"
+
 # ifdef __cplusplus
 }
 # endif
