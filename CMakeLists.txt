@@ -74,8 +74,6 @@ file(GENERATE OUTPUT util/shlib_wrap.sh
 
 exec "$@"
 ]===])
-execute_process(COMMAND chmod a+x util/shlib_wrap.sh
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 set(TEST_ENVIRONMENT
   OPENSSL_CMAKE_BUILD=1
@@ -91,10 +89,15 @@ set(TEST_ENVIRONMENT
   PERL5LIB=${CMAKE_CURRENT_SOURCE_DIR}/test:${CMAKE_CURRENT_SOURCE_DIR}/util/perl
   )
 
-#add_test(NAME prove-openssl
-#  COMMAND prove --merge -PWrapOpenSSL ${CMAKE_CURRENT_SOURCE_DIR}/test/recipes
-#  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test-runs)
-#set_tests_properties(prove-openssl PROPERTIES ENVIRONMENT "${TEST_ENVIRONMENT}")
+# Because of the little silliness that all cmake versions don't have the
+# file(CHMOD) sub-command, we must instead set the permissions of
+# util/shlib_wrap.sh in the test commands.
+# It's just as well that we add the test target with add_custom_target(),
+# because add_test() doesn't allow multiple commands in this manner.
+
 add_custom_target(test
-  ${CMAKE_COMMAND} -E env ${TEST_ENVIRONMENT}
-  prove --merge -PWrapOpenSSL ${CMAKE_CURRENT_SOURCE_DIR}/test/recipes)
+  COMMAND
+    chmod a+x util/shlib_wrap.sh
+  COMMAND
+    ${CMAKE_COMMAND} -E env ${TEST_ENVIRONMENT}
+    prove --merge -PWrapOpenSSL ${CMAKE_CURRENT_SOURCE_DIR}/test/recipes/$(TESTS))

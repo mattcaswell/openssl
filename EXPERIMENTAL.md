@@ -207,6 +207,16 @@ placeholder for the OpenSSL 1.1.1 source directory.
 
         make VERBOSE=1 test
 
+    It's also possible to select a subset of the tests using the make
+    variable TESTS.  Simply give it an exact file name:
+
+        make test TESTS=02-test_stack.t
+
+    or a glob of some kind:
+
+        make test TESTS=70-*.t
+        make test TESTS=*-test_rsa.t
+
 External code used
 ------------------
 
