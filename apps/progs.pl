@@ -11,21 +11,12 @@
 
 use strict;
 use warnings;
-use lib '.';
-use configdata qw/@disablables %unified_info/;
 
 my %commands     = ();
 my $cmdre        = qr/^\s*int\s+([a-z_][a-z0-9_]*)_main\(\s*int\s+argc\s*,/;
-my $apps_openssl = shift @ARGV;
 my $YEAR         = [localtime()]->[5] + 1900;
 
-# because the program apps/openssl has object files as sources, and
-# they then have the corresponding C files as source, we need to chain
-# the lookups in %unified_info
-my @openssl_source =
-    map { @{$unified_info{sources}->{$_}} }
-    grep { /\.o$/ }
-        @{$unified_info{sources}->{$apps_openssl}};
+my @openssl_source = @ARGV;
 
 foreach my $filename (@openssl_source) {
     open F, $filename or die "Couldn't open $filename: $!\n";
@@ -95,8 +86,8 @@ foreach my $cmd ( @ARGV ) {
     my $str = "    {FT_general, \"$cmd\", ${cmd}_main, ${cmd}_options},\n";
     if ($cmd =~ /^s_/) {
         print "#ifndef OPENSSL_NO_SOCK\n${str}#endif\n";
-    } elsif (grep { $cmd eq $_ } @disablables) {
-        print "#ifndef OPENSSL_NO_" . uc($cmd) . "\n${str}#endif\n";
+#    } elsif (grep { $cmd eq $_ } @disablables) {
+#        print "#ifndef OPENSSL_NO_" . uc($cmd) . "\n${str}#endif\n";
     } elsif (my $disabler = $cmd_disabler{$cmd}) {
         print "#ifndef OPENSSL_NO_" . uc($disabler) . "\n${str}#endif\n";
     } else {
@@ -119,8 +110,9 @@ foreach my $cmd (
     "sm3"
 ) {
     my $str = "    {FT_md, \"$cmd\", dgst_main},\n";
-    if (grep { $cmd eq $_ } @disablables) {
-        print "#ifndef OPENSSL_NO_" . uc($cmd) . "\n${str}#endif\n";
+    if (0) {
+#    } elsif (grep { $cmd eq $_ } @disablables) {
+#        print "#ifndef OPENSSL_NO_" . uc($cmd) . "\n${str}#endif\n";
     } elsif (my $disabler = $md_disabler{$cmd}) {
         print "#ifndef OPENSSL_NO_" . uc($disabler) . "\n${str}#endif\n";
     } else {
@@ -168,8 +160,8 @@ foreach my $cmd (
     (my $algo = $cmd) =~ s/-.*//g;
     if ($cmd eq "zlib") {
         print "#ifdef ZLIB\n${str}#endif\n";
-    } elsif (grep { $algo eq $_ } @disablables) {
-        print "#ifndef OPENSSL_NO_" . uc($algo) . "\n${str}#endif\n";
+#    } elsif (grep { $algo eq $_ } @disablables) {
+#        print "#ifndef OPENSSL_NO_" . uc($algo) . "\n${str}#endif\n";
     } elsif (my $disabler = $cipher_disabler{$algo}) {
         print "#ifndef OPENSSL_NO_" . uc($disabler) . "\n${str}#endif\n";
     } else {
