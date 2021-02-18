@@ -188,7 +188,9 @@ static STRINT_PAIR cert_type_list[] = {
     {"RSA fixed ECDH", TLS_CT_RSA_FIXED_ECDH},
     {"ECDSA fixed ECDH", TLS_CT_ECDSA_FIXED_ECDH},
     {"GOST01 Sign", TLS_CT_GOST01_SIGN},
+#if 0
     {"GOST12 Sign", TLS_CT_GOST12_SIGN},
+#endif
     {NULL}
 };
 
@@ -657,7 +659,9 @@ static STRINT_PAIR tlsext_types[] = {
     {"SRP", TLSEXT_TYPE_srp},
     {"signature algorithms", TLSEXT_TYPE_signature_algorithms},
     {"use SRTP", TLSEXT_TYPE_use_srtp},
+#if 0
     {"heartbeat", TLSEXT_TYPE_heartbeat},
+#endif
     {"session ticket", TLSEXT_TYPE_session_ticket},
     {"renegotiation info", TLSEXT_TYPE_renegotiate},
     {"signed certificate timestamps", TLSEXT_TYPE_signed_certificate_timestamp},
