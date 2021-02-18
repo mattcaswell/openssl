@@ -1,0 +1,41 @@
+name: EXPERIMENTAL CI
+
+on: [ pull_request, push ]
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+        with:
+          - name: NORMAL
+            openssl: ""
+            cmake: ""
+          - name: ASAN
+            openssl: enable-asan
+            cmake: -DENABLE_ASAN
+    runs-on: ${{matrix.os}}
+    steps:
+      - name: checkout OpenSSL 1.1.1 EXPERIMENTAL
+        uses: actions/checkout@v2
+      - name: checkout OpenSSL 3.0
+        uses: actions/checkout@v2
+        with:
+          repository: openssl/openssl
+          path: openssl-3.0-src
+      - name: configure OpenSSL 3.0 for ${{matrix.with.name}} build
+        run: ./Configure ${{matrix.with.openssl}}
+        working-directory: openssl-3.0-src
+      - name: build OpenSSL 3.0
+        run: make -s build_libs
+        working-directory: openssl-3.0-src
+      - name: configure OpenSSL 1.1.1 EXPERIMENTAL for ${{matrix.with.name}} build
+        run: cmake ${{matrix.with.cmake}}
+                   -DCMAKE_MODULE_PATH=$(pwd)/util/cmake/Modules
+                   -DCMAKE_PREFIX_PATH=$(cd openssl-3.0-src; pwd)
+                   -S . -B _build
+      - name: build OpenSSL 1.1.1 EXPERIMENTAL
+        run: cmake --build _build
+      - name: test OpenSSL 1.1.1 EXPERIMENTAL
+        run: make VERBOSE=1 test
+        working-directory: _build
