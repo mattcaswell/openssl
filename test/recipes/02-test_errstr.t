@@ -13,6 +13,8 @@ use OpenSSL::Test::Utils;
 use Errno qw(:POSIX);
 use POSIX qw(strerror);
 
+plan skip_all => "Test doesn't work in CMAKE build" if $ENV{OPENSSL_CMAKE_BUILD};
+
 # We actually have space for up to 4095 error messages,
 # numerically speaking...  but we're currently only using
 # numbers 1 through 127.

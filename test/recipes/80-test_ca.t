@@ -15,6 +15,9 @@ use File::Path 2.00 qw/rmtree/;
 use OpenSSL::Test qw/:DEFAULT cmdstr srctop_file/;
 use OpenSSL::Test::Utils;
 
+# Until we learn file generation with cmake...
+plan skip_all => "Test doesn't work in CMAKE build" if $ENV{OPENSSL_CMAKE_BUILD};
+
 setup("test_ca");
 
 $ENV{OPENSSL} = cmdstr(app(["openssl"]), display => 1);

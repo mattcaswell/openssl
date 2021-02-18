@@ -7,6 +7,9 @@
 # https://www.openssl.org/source/license.html
 
 
+use OpenSSL::Test;
 use OpenSSL::Test::Simple;
+
+plan skip_all => "Test doesn't work in CMAKE build" if $ENV{OPENSSL_CMAKE_BUILD};
 
 simple_test("test_threads", "threadstest");

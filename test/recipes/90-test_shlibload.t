@@ -18,6 +18,8 @@ BEGIN {
 use lib bldtop_dir('.');
 use configdata;
 
+plan skip_all => "Test doesn't work in CMAKE build" if $ENV{OPENSSL_CMAKE_BUILD};
+
 plan skip_all => "Test only supported in a shared build" if disabled("shared");
 plan skip_all => "Test is disabled on AIX" if config('target') =~ m|^aix|;
 plan skip_all => "Test is disabled on VMS" if config('target') =~ m|^vms|;

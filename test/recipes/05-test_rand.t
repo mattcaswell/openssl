@@ -10,6 +10,8 @@ use strict;
 use warnings;
 use OpenSSL::Test;
 
+plan skip_all => "Test doesn't work in CMAKE build" if $ENV{OPENSSL_CMAKE_BUILD};
+
 plan tests => 2;
 setup("test_rand");
 

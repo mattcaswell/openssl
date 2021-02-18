@@ -10,6 +10,8 @@
 use OpenSSL::Test;
 use OpenSSL::Test::Utils;
 
+plan skip_all => "Test doesn't work in CMAKE build" if $ENV{OPENSSL_CMAKE_BUILD};
+
 setup("test_wpacket");
 
 plan skip_all => "Test disabled in this configuration"

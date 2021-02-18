@@ -11,6 +11,8 @@ use OpenSSL::Test;              # get 'plan'
 use OpenSSL::Test::Simple;
 use OpenSSL::Test::Utils;
 
+plan skip_all => "Test doesn't work in CMAKE build" if $ENV{OPENSSL_CMAKE_BUILD};
+
 setup("test_internal_sm2");
 
 simple_test("test_internal_sm2", "sm2_internal_test", "sm2");
