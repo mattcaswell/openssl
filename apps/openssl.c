@@ -145,10 +145,12 @@ int main(int argc, char *argv[])
     win32_utf8argv(&argc, &argv);
 #endif
 
+#ifndef OPENSSL_NO_CRYPTO_MDEBUG
     p = getenv("OPENSSL_DEBUG_MEMORY");
     if (p != NULL && strcmp(p, "on") == 0)
         CRYPTO_set_mem_debug(1);
     CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
+#endif
 
     if (getenv("OPENSSL_FIPS")) {
         BIO_printf(bio_err, "FIPS mode not supported.\n");

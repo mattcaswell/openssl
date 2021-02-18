@@ -152,8 +152,10 @@ static int test_func(int test)
 
 int global_init(void)
 {
+#ifndef OPENSSL_NO_CRYPTO_MDEBUG
     CRYPTO_set_mem_debug(1);
     CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
+#endif
     return 1;
 }
 

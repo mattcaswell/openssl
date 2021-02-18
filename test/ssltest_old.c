@@ -924,9 +924,11 @@ int main(int argc, char *argv[])
     bio_err = BIO_new_fp(stderr, BIO_NOCLOSE | BIO_FP_TEXT);
 
     p = getenv("OPENSSL_DEBUG_MEMORY");
+#ifndef OPENSSL_NO_CRYPTO_MDEBUG
     if (p != NULL && strcmp(p, "on") == 0)
         CRYPTO_set_mem_debug(1);
     CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
+#endif
 
     bio_stdout = BIO_new_fp(stdout, BIO_NOCLOSE | BIO_FP_TEXT);
 
