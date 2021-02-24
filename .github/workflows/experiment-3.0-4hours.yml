@@ -1,5 +1,12 @@
 name: EXPERIMENTAL Scheduled
 
+# RANDOM COMMENT <1>.
+# Due to a catch-22, where github seems to need another push of this file
+# for the schedule to catch, we have this random comment that can be updated
+# to provide that push.
+# Just update the number between < and > when this is needed, commit and push.
+# Ref: https://github.community/t/schedule-workflows-missing/17653
+
 on:
   schedule:
     # Run this experiment every 4th hour
