@@ -288,12 +288,14 @@ ok(!verify("ee-cert-md5", "sslserver", ["root-cert"], ["ca-cert"]),
 SKIP: {
     skip "EC is not supported by this OpenSSL build", 5
         if disabled("ec");
-    ok(verify("ee-cert-ec-explicit", "sslserver", ["root-cert"],
-               ["ca-cert-ec-named"]),
-        "accept explicit curve leaf with named curve intermediate without strict");
-    ok(verify("ee-cert-ec-named-explicit", "sslserver", ["root-cert"],
-               ["ca-cert-ec-explicit"]),
-        "accept named curve leaf with explicit curve intermediate without strict");
+
+# 3.0 rejects explicit curves even without strict
+#    ok(verify("ee-cert-ec-explicit", "sslserver", ["root-cert"],
+#               ["ca-cert-ec-named"]),
+#        "accept explicit curve leaf with named curve intermediate without strict");
+#    ok(verify("ee-cert-ec-named-explicit", "sslserver", ["root-cert"],
+#               ["ca-cert-ec-explicit"]),
+#        "accept named curve leaf with explicit curve intermediate without strict");
     ok(!verify("ee-cert-ec-explicit", "sslserver", ["root-cert"],
                ["ca-cert-ec-named"], "-x509_strict"),
         "reject explicit curve leaf with named curve intermediate with strict");
