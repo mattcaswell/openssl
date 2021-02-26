@@ -63,8 +63,10 @@ static int dh_test(void)
         || !TEST_true(DH_set0_pqg(dh, p, q, g)))
         goto err1;
 
+    /* check fails, because p is way too small */
     if (!DH_check(dh, &i))
         goto err2;
+    i ^= DH_MODULUS_TOO_SMALL;
     if (!TEST_false(i & DH_CHECK_P_NOT_PRIME)
             || !TEST_false(i & DH_CHECK_P_NOT_SAFE_PRIME)
             || !TEST_false(i & DH_CHECK_INVALID_Q_VALUE)
@@ -103,6 +105,8 @@ static int dh_test(void)
         || !TEST_ptr_eq(DH_get0_priv_key(dh), priv_key2))
         goto err3;
 
+    /* Original test code will fail due to modulus being too small */
+#if 0
     /* now generate a key pair ... */
     if (!DH_generate_key(dh))
         goto err3;
@@ -122,6 +126,14 @@ static int dh_test(void)
 
     /* check whether the public key was calculated correctly */
     TEST_uint_eq(BN_get_word(pub_key2), 3331L);
+#else
+    /* now generate a key pair (expect failure since modulus is too small) */
+    if (!TEST_false(DH_generate_key(dh)))
+        goto err3;
+
+    /* We'll have a stale error on the queue from the above test so clear it */
+    ERR_clear_error();
+#endif
 
     /*
      * II) key generation
@@ -132,8 +144,13 @@ static int dh_test(void)
         goto err3;
     BN_GENCB_set(_cb, &cb, NULL);
     if (!TEST_ptr(a = DH_new())
+#if 0
             || !TEST_true(DH_generate_parameters_ex(a, 64,
                                                     DH_GENERATOR_5, _cb)))
+#else
+            || !TEST_true(DH_generate_parameters_ex(a, 512,
+                                                    DH_GENERATOR_5, _cb)))
+#endif
         goto err3;
 
     /* ... and check whether it is valid */
