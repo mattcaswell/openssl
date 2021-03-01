@@ -2416,8 +2416,14 @@ static int check_test_error(EVP_TEST *t)
         return 1;
     }
 
+    /* 3.0 does not have func strings. We just check the reason */
+#if 0
     if (strcmp(func, t->func) == 0 && strcmp(reason, t->reason) == 0)
         return 1;
+#else
+    if (strcmp(reason, t->reason) == 0)
+        return 1;
+#endif
 
     TEST_info("%s:%d: Expected error \"%s:%s\", got \"%s:%s\"",
               t->s.test_file, t->s.start, t->func, t->reason, func, reason);
