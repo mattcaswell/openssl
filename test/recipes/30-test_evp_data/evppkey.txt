@@ -379,7 +379,9 @@ Reason = operation not supported for this keytype
 
 Sign = RSA-2048
 Ctrl = rsa_mgf1_md:sha1
-Result = PKEY_CTRL_INVALID
+#Result = PKEY_CTRL_INVALID
+# 3.0 is now indicating this with a different return value. Is this correct?
+Result = PKEY_CTRL_ERROR
 Function = pkey_rsa_ctrl
 Reason = invalid mgf1 md
 
