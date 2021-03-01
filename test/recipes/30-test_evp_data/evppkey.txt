@@ -17831,7 +17831,9 @@ Result = VERIFY_ERROR
 KeyGen = rsaEncryption
 Ctrl = rsa_keygen_bits:128
 KeyName = tmprsa
-Result = PKEY_CTRL_INVALID
+#In 3.0, the ctrl no longer fails and instead the failure occurs much later
+#Result = PKEY_CTRL_INVALID
+Result = KEYGEN_GENERATE_ERROR
 Function = pkey_rsa_ctrl
 Reason = key size too small
 
