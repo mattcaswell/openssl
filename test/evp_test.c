@@ -1997,7 +1997,8 @@ static int keygen_test_run(EVP_TEST *t)
     t->err = NULL;
     if (EVP_PKEY_keygen(keygen->genctx, &pkey) <= 0) {
         t->err = "KEYGEN_GENERATE_ERROR";
-        goto err;
+        EVP_PKEY_free(pkey);
+        return 1;
     }
 
     if (keygen->keyname != NULL) {
