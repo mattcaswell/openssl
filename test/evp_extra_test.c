@@ -1163,10 +1163,20 @@ static int test_EVP_PKEY_set1_DH(void)
 {
     DH *x942dh, *pkcs3dh;
     EVP_PKEY *pkey1, *pkey2;
+    BIGNUM *p, *g, *p2, *g2;
     int ret = 0;
 
     x942dh = DH_get_2048_256();
+#if 0
     pkcs3dh = DH_new_by_nid(NID_ffdhe2048);
+#else
+    /*
+     * In 3.0 the ffdhe2048 group is treated as EVP_PKEY_DHX. Instead we create
+     * an empty DH object which should be treated as EVP_PKEY_DH when assigned
+     * to the EVP_PKEY.
+     */
+    pkcs3dh = DH_new();
+#endif
     pkey1 = EVP_PKEY_new();
     pkey2 = EVP_PKEY_new();
     if (!TEST_ptr(x942dh)
