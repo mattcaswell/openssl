@@ -3379,6 +3379,12 @@ static int test_set_ciphersuite(int idx)
     return testresult;
 }
 
+#if 0
+/*
+ * This test uses internal knowledge of the SSL_SESSION structure which normal
+ * applications would not have. Since the structure has changed 1.1.1->3.0, it
+ * does not work when testing against 3.0 libs.
+ */
 static int test_ciphersuite_change(void)
 {
     SSL_CTX *cctx = NULL, *sctx = NULL;
@@ -3507,6 +3513,7 @@ static int test_ciphersuite_change(void)
 
     return testresult;
 }
+#endif
 
 /*
  * Test TLSv1.3 Cipher Suite
@@ -6800,7 +6807,13 @@ int setup_tests(void)
 #endif
 #ifndef OPENSSL_NO_TLS1_3
     ADD_ALL_TESTS(test_set_ciphersuite, 10);
+#if 0
+    /*
+     * Disabled when running against 3.0 libs because it needs internal knowledge
+     * of SSL_SESSION structure.
+     */
     ADD_TEST(test_ciphersuite_change);
+#endif
     ADD_ALL_TESTS(test_tls13_ciphersuite, 4);
 #ifdef OPENSSL_NO_PSK
     ADD_ALL_TESTS(test_tls13_psk, 1);
