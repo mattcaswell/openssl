@@ -612,6 +612,12 @@ static int test_EVP_PKCS82PKEY(void)
 
 #ifndef OPENSSL_NO_SM2
 
+/*
+ * With OpenSSL 3.0, this doesn't work, because |pubkey| isn't an actual
+ * SM2 key by any definition.  SM2 keys have an SM2 curve by definition.
+ */
+#ifndef OPENSSL_VERSION_MAJOR
+
 static int test_EVP_SM2_verify(void)
 {
     /* From https://tools.ietf.org/html/draft-shen-sm2-ecdsa-02#appendix-A */
@@ -689,6 +695,7 @@ static int test_EVP_SM2_verify(void)
     EVP_MD_CTX_free(mctx);
     return rc;
 }
+#endif
 
 static int test_EVP_SM2(void)
 {
@@ -712,7 +719,11 @@ static int test_EVP_SM2(void)
 
     uint8_t sm2_id[] = {1, 2, 3, 4, 'l', 'e', 't', 't', 'e', 'r'};
 
+#ifdef OPENSSL_VERSION_MAJOR
+    pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_SM2, NULL);
+#else
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
+#endif
     if (!TEST_ptr(pctx))
         goto done;
 
@@ -1195,7 +1206,9 @@ int setup_tests(void)
 #endif
 #ifndef OPENSSL_NO_SM2
     ADD_TEST(test_EVP_SM2);
+# ifndef OPENSSL_VERSION_MAJOR
     ADD_TEST(test_EVP_SM2_verify);
+# endif
 #endif
     ADD_ALL_TESTS(test_set_get_raw_keys, OSSL_NELEM(keys));
     custom_pmeth = EVP_PKEY_meth_new(0xdefaced, 0);
