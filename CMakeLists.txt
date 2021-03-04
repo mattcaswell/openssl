@@ -56,11 +56,21 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test-runs)
 file(GENERATE OUTPUT test/default-and-legacy.cnf
   CONTENT [===[
 openssl_conf = openssl_def
+
 [openssl_def]
 providers = providers
+ssl_conf = ssl_sect
+
+[ssl_sect]
+system_default = system_default_sect
+
+[system_default_sect]
+CipherString = DEFAULT:@SECLEVEL=0
+
 [providers]
 default = provider_conf
 legacy = provider_conf
+
 [provider_conf]
 activate = 1
 ]===])
