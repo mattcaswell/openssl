@@ -279,6 +279,7 @@ static int test_rsa_pkcs1(int idx)
                            NULL, NULL);
 }
 
+#ifdef RSA_SSLV23_PADDING
 static int test_rsa_sslv23(int idx)
 {
     int ret;
@@ -300,6 +301,7 @@ static int test_rsa_sslv23(int idx)
 
     return ret;
 }
+#endif
 
 static int test_rsa_oaep(int idx)
 {
@@ -353,7 +355,9 @@ err:
 int setup_tests(void)
 {
     ADD_ALL_TESTS(test_rsa_pkcs1, 3);
+#ifdef RSA_SSLV23_PADDING
     ADD_ALL_TESTS(test_rsa_sslv23, 3);
+#endif
     ADD_ALL_TESTS(test_rsa_oaep, 3);
     return 1;
 }

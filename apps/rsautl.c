@@ -27,7 +27,11 @@
 typedef enum OPTION_choice {
     OPT_ERR = -1, OPT_EOF = 0, OPT_HELP,
     OPT_ENGINE, OPT_IN, OPT_OUT, OPT_ASN1PARSE, OPT_HEXDUMP,
-    OPT_RAW, OPT_OAEP, OPT_SSL, OPT_PKCS, OPT_X931,
+    OPT_RAW, OPT_OAEP,
+#ifdef RSA_SSLV23_PADDING
+    OPT_SSL,
+#endif
+    OPT_PKCS, OPT_X931,
     OPT_SIGN, OPT_VERIFY, OPT_REV, OPT_ENCRYPT, OPT_DECRYPT,
     OPT_PUBIN, OPT_CERTIN, OPT_INKEY, OPT_PASSIN, OPT_KEYFORM,
     OPT_R_ENUM
@@ -41,7 +45,9 @@ const OPTIONS rsautl_options[] = {
     {"keyform", OPT_KEYFORM, 'E', "Private key format - default PEM"},
     {"pubin", OPT_PUBIN, '-', "Input is an RSA public"},
     {"certin", OPT_CERTIN, '-', "Input is a cert carrying an RSA public key"},
+#ifdef RSA_SSLV23_PADDING
     {"ssl", OPT_SSL, '-', "Use SSL v2 padding"},
+#endif
     {"raw", OPT_RAW, '-', "Use no padding"},
     {"pkcs", OPT_PKCS, '-', "Use PKCS#1 v1.5 padding (default)"},
     {"oaep", OPT_OAEP, '-', "Use PKCS#1 OAEP"},
@@ -114,9 +120,11 @@ int rsautl_main(int argc, char **argv)
         case OPT_OAEP:
             pad = RSA_PKCS1_OAEP_PADDING;
             break;
+#ifdef RSA_SSLV23_PADDING
         case OPT_SSL:
             pad = RSA_SSLV23_PADDING;
             break;
+#endif
         case OPT_PKCS:
             pad = RSA_PKCS1_PADDING;
             break;
