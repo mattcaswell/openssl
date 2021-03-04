@@ -874,7 +874,7 @@ sub __env {
     $directories{BLDTOP}  = abs_path($ENV{BLDTOP} || $ENV{TOP});
     $directories{BLDAPPS} = $ENV{BIN_D}  || __bldtop_dir("apps");
     $directories{SRCAPPS} =                 __srctop_dir("apps");
-    $directories{BLDFUZZ} =                 __bldtop_dir("fuzz");
+    $directories{BLDFUZZ} = $ENV{FUZZ_D} || __bldtop_dir("fuzz");
     $directories{SRCFUZZ} =                 __srctop_dir("fuzz");
     $directories{BLDTEST} = $ENV{TEST_D} || __bldtop_dir("test");
     $directories{SRCTEST} =                 __srctop_dir("test");
