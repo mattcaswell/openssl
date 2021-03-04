@@ -477,6 +477,23 @@ static int test_handshake(int idx)
             || !TEST_int_gt(CONF_modules_load(conf, test_app, 0),  0))
         goto err;
 
+#if 1
+    /*
+     * Lower the default security level to 0 for all our SSL_CTX objects. This
+     * is because TLSv1 and TLSv1.1 do not work at the default security level
+     * in 3.0. Lots of tests assume they are available so we lower the default
+     * to enable them to continue to work.
+     */
+    SSL_CTX_set_security_level(server_ctx, 0);
+    SSL_CTX_set_security_level(client_ctx, 0);
+    if (server2_ctx != NULL)
+        SSL_CTX_set_security_level(server2_ctx, 0);
+    if (resume_server_ctx != NULL)
+        SSL_CTX_set_security_level(resume_server_ctx, 0);
+    if (resume_client_ctx != NULL)
+        SSL_CTX_set_security_level(resume_client_ctx, 0);
+#endif
+
     if (!SSL_CTX_config(server_ctx, "server")
         || !SSL_CTX_config(client_ctx, "client")) {
         goto err;
