@@ -14,6 +14,8 @@ use OpenSSL::Test::Utils;
 
 setup("test_symbol_presence");
 
+plan skip_all => "Test doesn't work in CMAKE build"
+    if $ENV{OPENSSL_CMAKE_BUILD};
 plan skip_all => "Only useful when building shared libraries"
     if disabled("shared");
 
