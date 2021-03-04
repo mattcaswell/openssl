@@ -867,7 +867,8 @@ my @tests_tls_1_3 = (
             "MaxProtocol" => "TLSv1.3"
         },
         test   => {
-            "ExpectedResult" => "ServerFail"
+            #In 3.0 we detect this error earlier (on the client instead of in the server)
+            "ExpectedResult" => "ClientFail"
         },
     },
 );
