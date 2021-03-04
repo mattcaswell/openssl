@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <openssl/opensslv.h>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
@@ -320,6 +321,15 @@ static const unsigned char pExampleECParamDER[] = {
 };
 #endif
 
+#ifdef OPENSSL_VERSION_MAJOR
+# define EXPECTED_RSA_PUBCHECK 1
+# define EXPECTED_RSA_PARAMCHECK 1
+#else
+/* Unsupported */
+# define EXPECTED_RSA_PUBCHECK -2
+# define EXPECTED_RSA_PARAMCHECK -2
+#endif
+
 typedef struct APK_DATA_st {
     const unsigned char *kder;
     size_t size;
@@ -339,9 +349,10 @@ static APK_DATA keydata[] = {
 };
 
 static APK_DATA keycheckdata[] = {
-    {kExampleRSAKeyDER, sizeof(kExampleRSAKeyDER), EVP_PKEY_RSA, 1, -2, -2, 0},
+    {kExampleRSAKeyDER, sizeof(kExampleRSAKeyDER), EVP_PKEY_RSA,
+     1, EXPECTED_RSA_PUBCHECK, EXPECTED_RSA_PARAMCHECK, 0},
     {kExampleBadRSAKeyDER, sizeof(kExampleBadRSAKeyDER), EVP_PKEY_RSA,
-     0, -2, -2, 0},
+     0, EXPECTED_RSA_PUBCHECK, EXPECTED_RSA_PARAMCHECK, 0},
 #ifndef OPENSSL_NO_EC
     {kExampleECKeyDER, sizeof(kExampleECKeyDER), EVP_PKEY_EC, 1, 1, 1, 0},
     /* group is also associated in our pub key */
