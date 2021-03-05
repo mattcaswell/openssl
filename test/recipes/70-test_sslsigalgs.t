@@ -145,7 +145,10 @@ SKIP: {
     $proxy->clientflags("-no_tls1_3 -cipher DEFAULT\@SECLEVEL=1");
     $proxy->ciphers("ECDHE-RSA-AES128-SHA\@SECLEVEL=1");
     $proxy->start();
-    ok(TLSProxy::Message->success, "No TLSv1.2 sigalgs seclevel 1");
+#    ok(TLSProxy::Message->success, "No TLSv1.2 sigalgs seclevel 1");
+    #In 3.0 SHA1 is not available as one of the "legacy" sig algs and therefore
+    #this should fail
+    ok(TLSProxy::Message->fail, "No TLSv1.2 sigalgs seclevel 1");
 
     #Test 11: Sending no sig algs extension in TLSv1.2 should fail at security
     #         level 2 since it will try to use SHA1. Testing client at level 1,
