@@ -231,9 +231,29 @@ static int test_ssl_corrupt(int testidx)
     if (!TEST_int_lt(SSL_read(server, junk, sizeof(junk)), 0))
         goto end;
 
+#if 0
     if (!TEST_int_eq(ERR_GET_REASON(ERR_peek_error()),
                      SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC))
         goto end;
+#else
+    {
+        long err;
+
+        /*
+         * The test assumed that there would only ever be one error on the
+         * stack signalling a bad record MAC. This was true in 1.1.1, but is not
+         * the case in 3.0.
+         */
+        while((err = ERR_get_error()) != 0) {
+            if (ERR_GET_REASON(err)
+                    == SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC)
+                break;
+        }
+        if (!TEST_int_eq(ERR_GET_REASON(err),
+                         SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC))
+            goto end;
+    }
+#endif
 
     testresult = 1;
  end:
