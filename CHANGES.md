@@ -909,6 +909,9 @@ OpenSSL 3.0
    to generate EVP_PKEY_SM2 parameters and keys. Applications must now generate
    SM2 keys directly and must not create an EVP_PKEY_EC key first.
 
+   It is no longer possible to load SM2 keys based on a non-SM2 curve (or
+   similarly you cannot load ECDSA/ECDH keys based on the SM2 curve).
+
    *Richard Levitte*
 
  * Deprecated low level ECDH and ECDSA functions.  These include:
