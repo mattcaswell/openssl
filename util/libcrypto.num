@@ -5426,3 +5426,13 @@ ASN1_TIME_print_ex                      5553	3_0_0	EXIST::FUNCTION:
 EVP_PKEY_get0_provider                  5554	3_0_0	EXIST::FUNCTION:
 EVP_PKEY_CTX_get0_provider              5555	3_0_0	EXIST::FUNCTION:
 OSSL_STACK_OF_X509_free                 ?	3_1_0	EXIST::FUNCTION:
+OSSL_TOY_CTX_new                        ?	3_1_0	EXIST::FUNCTION:
+OSSL_TOY_CTX_free                       ?	3_1_0	EXIST::FUNCTION:
+OSSL_TOY_CTX_set0_bios                  ?	3_1_0	EXIST::FUNCTION:
+OSSL_TOY_CTX_get0_connection            ?	3_1_0	EXIST::FUNCTION:
+OSSL_TOY_CTX_process_packet             ?	3_1_0	EXIST::FUNCTION:
+OSSL_TOY_CONN_get0_stream               ?	3_1_0	EXIST::FUNCTION:
+OSSL_TOY_STREAM_read                    ?	3_1_0	EXIST::FUNCTION:
+OSSL_TOY_STREAM_write                   ?	3_1_0	EXIST::FUNCTION:
+OSSL_TOY_CONN_get_id                    ?	3_1_0	EXIST::FUNCTION:
+OSSL_TOY_STREAM_get_id                  ?	3_1_0	EXIST::FUNCTION:
