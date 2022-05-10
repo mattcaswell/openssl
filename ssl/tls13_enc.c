@@ -710,13 +710,15 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
                        ? OSSL_RECORD_PROTECTION_LEVEL_HANDSHAKE
                        : OSSL_RECORD_PROTECTION_LEVEL_APPLICATION);
 
-        if (!ssl_set_new_record_layer(s, NULL, s->version,
+        if (!ssl_set_new_record_layer(s, s->version,
                                     OSSL_RECORD_DIRECTION_READ,
                                     level, key, keylen, iv, ivlen, NULL, 0,
                                     cipher, taglen, NID_undef, NULL, NULL)) {
-            /* SSLfatal already called */
+            SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_NO_SUITABLE_RECORD_LAYER);
             goto err;
         }
+        /* TODO(RECLAYER): Remove me */
+        goto skip_ktls;
     }
 
 #ifndef OPENSSL_NO_KTLS
@@ -734,7 +736,7 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
         goto skip_ktls;
 
     /* check that cipher is supported */
-    if (!ktls_check_supported_cipher(s, cipher, ciph_ctx))
+    if (!ktls_check_supported_cipher(s, cipher, taglen))
         goto skip_ktls;
 
     if (which & SSL3_CC_WRITE)
@@ -759,8 +761,9 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
     else
         rl_sequence = RECORD_LAYER_get_read_sequence(&s->rlayer);
 
-    if (!ktls_configure_crypto(s, cipher, ciph_ctx, rl_sequence, &crypto_info,
-                               which & SSL3_CC_WRITE, iv, key, NULL, 0))
+    if (!ktls_configure_crypto(s, cipher, rl_sequence, &crypto_info,
+                               which & SSL3_CC_WRITE, iv, ivlen, key, keylen,
+                               NULL, 0))
         goto skip_ktls;
 
     /* ktls works with user provided buffers directly */
@@ -768,9 +771,9 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
         if (which & SSL3_CC_WRITE)
             ssl3_release_write_buffer(s);
     }
-skip_ktls:
 # endif
 #endif
+skip_ktls:
     ret = 1;
  err:
     if ((which & SSL3_CC_EARLY) != 0) {
@@ -826,13 +829,13 @@ int tls13_update_key(SSL_CONNECTION *s, int sending)
     memcpy(insecret, secret, hashlen);
 
     if (!sending) {
-        if (!ssl_set_new_record_layer(s, NULL, s->version,
+        if (!ssl_set_new_record_layer(s, s->version,
                                 OSSL_RECORD_DIRECTION_READ,
                                 OSSL_RECORD_PROTECTION_LEVEL_APPLICATION,
                                 key, keylen, iv, ivlen, NULL, 0,
                                 s->s3.tmp.new_sym_enc, taglen, NID_undef, NULL,
                                 NULL)) {
-            /* SSLfatal already called */
+            SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_NO_SUITABLE_RECORD_LAYER);
             goto err;
         }
     }
