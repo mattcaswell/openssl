@@ -54,7 +54,7 @@ struct ossl_record_layer_st {
     OSSL_RECORD_TEMPLATE template;
 
     /*
-     * Temp buffer for storing received data (copied from the sream receive
+     * Temp buffer for storing received data (copied from the stream receive
      * buffer)
      */
     unsigned char recbuf[SSL3_RT_MAX_PLAIN_LENGTH];
@@ -230,6 +230,8 @@ static int quic_write_records(OSSL_RECORD_LAYER *rl,
         return OSSL_RECORD_RETURN_FATAL;
     }
 
+    BIO_clear_retry_flags(rl->dummybio);
+
     if (rl->msg_callback != NULL) {
         unsigned char dummyrec[SSL3_RT_HEADER_LENGTH];
 
@@ -264,17 +266,17 @@ static int quic_write_records(OSSL_RECORD_LAYER *rl,
     case SSL3_RT_ALERT:
         if (template->buflen != 2) {
             /*
-                * We assume that libssl always sends both bytes of an alert to
-                * us in one go, and never fragments it. If we ever get more
-                * or less bytes than exactly 2 then this is very unexpected.
-                */
+             * We assume that libssl always sends both bytes of an alert to
+             * us in one go, and never fragments it. If we ever get more
+             * or less bytes than exactly 2 then this is very unexpected.
+             */
             QUIC_TLS_FATAL(rl, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_VALUE);
             return OSSL_RECORD_RETURN_FATAL;
         }
         /*
-            * Byte 0 is the alert level (we ignore it) and byte 1 is the alert
-            * description that we are actually interested in.
-            */
+         * Byte 0 is the alert level (we ignore it) and byte 1 is the alert
+         * description that we are actually interested in.
+         */
         alert = template->buf[1];
 
         if (!rl->qtls->args.alert_cb(rl->qtls->args.alert_cb_arg, alert)) {
@@ -285,9 +287,9 @@ static int quic_write_records(OSSL_RECORD_LAYER *rl,
 
     case SSL3_RT_HANDSHAKE:
         /*
-            * We expect this to only fail on some fatal error (e.g. malloc
-            * failure)
-            */
+         * We expect this to only fail on some fatal error (e.g. malloc
+         * failure)
+         */
         if (!rl->qtls->args.crypto_send_cb(template->buf + rl->written,
                                            template->buflen - rl->written,
                                            &consumed,
@@ -313,6 +315,7 @@ static int quic_write_records(OSSL_RECORD_LAYER *rl,
              */
             rl->written += consumed;
             rl->template = *template;
+            BIO_set_retry_write(rl->dummybio);
 
             return OSSL_RECORD_RETURN_RETRY;
         }
