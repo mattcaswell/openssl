@@ -637,10 +637,8 @@ int ossl_quic_tls_tick(QUIC_TLS *qtls)
 
     if (!qtls->configured) {
         SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL(qtls->args.s);
-        BIO *nullbio = BIO_new(BIO_s_null());
+        BIO *nullbio;
 
-        if (nullbio == NULL)
-            return 0;
         /*
          * No matter how the user has configured us, there are certain
          * requirements for QUIC-TLS that we enforce
@@ -667,6 +665,12 @@ int ossl_quic_tls_tick(QUIC_TLS *qtls)
                                             add_transport_params_cb,
                                             free_transport_params_cb, qtls,
                                             parse_transport_params_cb, qtls)) {
+            qtls->inerror = 1;
+            return 0;
+        }
+
+        nullbio = BIO_new(BIO_s_null());
+        if (nullbio == NULL) {
             qtls->inerror = 1;
             return 0;
         }
