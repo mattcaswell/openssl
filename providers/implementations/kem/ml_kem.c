@@ -155,7 +155,7 @@ static int mlkem_decapsulate(void *vctx, unsigned char *out, size_t *outlen,
     return 1;
 }
 
-const OSSL_DISPATCH ossl_mlkem_asym_key_functions[] = {
+const OSSL_DISPATCH ossl_mlkem768_asym_key_functions[] = {
     { OSSL_FUNC_KEM_NEWCTX, (void (*)(void))mlkem_newctx },
     { OSSL_FUNC_KEM_ENCAPSULATE_INIT,
       (void (*)(void))mlkem_encapsulate_init },

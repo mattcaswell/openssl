@@ -314,7 +314,7 @@ static void *mlkem_dup(const void *vsrckey, int selection)
     return NULL;
 }
 
-const OSSL_DISPATCH ossl_mlkem_keymgmt_functions[] = {
+const OSSL_DISPATCH ossl_mlkem768_keymgmt_functions[] = {
     { OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))mlkem_new },
     { OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))mlkem_free },
     { OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*) (void))mlkem_get_params },
