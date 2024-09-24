@@ -37,6 +37,11 @@ static OSSL_FUNC_keymgmt_set_params_fn mlkem_set_params;
 static OSSL_FUNC_keymgmt_settable_params_fn mlkem_settable_params;
 static OSSL_FUNC_keymgmt_has_fn mlkem_has;
 static OSSL_FUNC_keymgmt_match_fn mlkem_match;
+static OSSL_FUNC_keymgmt_import_fn mlkem_import;
+static OSSL_FUNC_keymgmt_export_fn mlkem_export;
+static OSSL_FUNC_keymgmt_import_types_fn mlkem_imexport_types;
+static OSSL_FUNC_keymgmt_export_types_fn mlkem_imexport_types;
+
 static OSSL_FUNC_keymgmt_dup_fn mlkem_dup;
 
 #define ECX_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_KEYPAIR)
@@ -48,9 +53,14 @@ struct mlkem_gen_ctx {
 
 static void *mlkem_new(void *provctx)
 {
+    MLKEM_KEY* key = NULL;
     if (!ossl_prov_is_running())
         return 0;
-    return OPENSSL_zalloc(sizeof(MLKEM_KEY));
+    key = OPENSSL_zalloc(sizeof(MLKEM_KEY));
+    if (key == NULL)
+        return 0;
+    key->keytype = MLKEM_KEY_TYPE_768; /* TODO any type */
+    return key;
 }
 
 static void mlkem_free(void *vkey)
@@ -126,6 +136,166 @@ static int mlkem_match(const void *keydata1, const void *keydata2, int selection
         ok = ok && key_checked;
     }
     return ok;
+}
+
+static int key_to_params(MLKEM_KEY *key, OSSL_PARAM_BLD *tmpl,
+                         OSSL_PARAM params[], int include_private)
+{
+    if (key == NULL)
+        return 0;
+
+    /* TODO: Generalize to all key types */
+    if (key->keytype != MLKEM_KEY_TYPE_768) {
+        return 0;
+    }
+
+    if (!ossl_param_build_set_octet_string(tmpl, params,
+                                           OSSL_PKEY_PARAM_PUB_KEY,
+                                           key->pubkey, MLKEM768_PUBLICKEYBYTES))
+        return 0;
+
+    if (include_private
+        && key->seckey != NULL
+        && !ossl_param_build_set_octet_string(tmpl, params,
+                                              OSSL_PKEY_PARAM_PRIV_KEY,
+                                              key->seckey, MLKEM768_SECRETKEYBYTES))
+        return 0;
+
+    return 1;
+}
+
+static int mlkem_export(void *key, int selection, OSSL_CALLBACK *param_cb,
+                        void *cbarg)
+{
+    MLKEM_KEY *mkey = key;
+    OSSL_PARAM_BLD *tmpl;
+    OSSL_PARAM *params = NULL;
+    int ret = 0;
+
+    if (!ossl_prov_is_running() || key == NULL)
+        return 0;
+
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
+        return 0;
+
+    tmpl = OSSL_PARAM_BLD_new();
+    if (tmpl == NULL)
+        return 0;
+
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0) {
+        int include_private = ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0);
+
+        if (!key_to_params(mkey, tmpl, NULL, include_private))
+            goto err;
+    }
+
+    params = OSSL_PARAM_BLD_to_param(tmpl);
+    if (params == NULL)
+        goto err;
+
+    ret = param_cb(params, cbarg);
+    OSSL_PARAM_free(params);
+err:
+    OSSL_PARAM_BLD_free(tmpl);
+    return ret;
+}
+
+static int ossl_mlkem_key_fromdata(MLKEM_KEY *key,
+                                   const OSSL_PARAM params[],
+                                   int include_private)
+{
+    size_t privkeylen = 0, pubkeylen = 0;
+    const OSSL_PARAM *param_priv_key = NULL, *param_pub_key;
+    unsigned char *pubkey;
+
+    if (key == NULL)
+        return 0;
+
+    /* TODO: Generalize to all key types */
+    if (key->keytype != MLKEM_KEY_TYPE_768) {
+        return 0;
+    }
+
+    param_pub_key = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PUB_KEY);
+    if (include_private)
+        param_priv_key =
+            OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY);
+
+    if (param_pub_key == NULL && param_priv_key == NULL)
+        return 0;
+
+    if (param_priv_key != NULL) {
+        if (!OSSL_PARAM_get_octet_string(param_priv_key,
+                                         (void **)&key->seckey,
+                                         MLKEM768_SECRETKEYBYTES,
+                                         &privkeylen))
+            return 0;
+        if (privkeylen != MLKEM768_SECRETKEYBYTES) {
+            /*
+             * Invalid key length. We will clear what we've received now. We
+             * can't leave it to ossl_mlkem_key_free() because that will call
+             * OPENSSL_secure_clear_free() and assume the correct key length
+             */
+            printf("sec key len mismatch in import: %ld vs %d: HOWCAN?\n",
+                privkeylen, MLKEM768_SECRETKEYBYTES);
+            OPENSSL_secure_clear_free(key->seckey, privkeylen);
+            key->seckey = NULL;
+            return 0;
+        }
+    }
+
+
+    pubkey = key->pubkey;
+    if (param_pub_key != NULL
+        && !OSSL_PARAM_get_octet_string(param_pub_key,
+                                        (void **)&pubkey,
+                                        MLKEM768_PUBLICKEYBYTES,
+                                        &pubkeylen))
+        return 0;
+
+    if ((param_pub_key != NULL && pubkeylen != MLKEM768_PUBLICKEYBYTES)) {
+        printf("sec key len mismatch in import: %ld vs %d: HOWCAN?\n",
+            pubkeylen, MLKEM768_PUBLICKEYBYTES);
+        return 0;
+    }
+
+    /* TBD if this also shall contain hybrid logic: reconstitute (only) classic part here */
+
+    return 1;
+}
+
+static int mlkem_import(void *key, int selection, const OSSL_PARAM params[])
+{
+    MLKEM_KEY *mkey = key;
+    int ok = 1;
+    int include_private;
+
+    if (!ossl_prov_is_running() || key == NULL)
+        return 0;
+
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
+        return 0;
+
+    include_private = selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY ? 1 : 0;
+    ok = ok && ossl_mlkem_key_fromdata(mkey, params, include_private);
+
+    return ok;
+}
+
+#define MLKEM_KEY_TYPES()                                                        \
+OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0),                     \
+OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0)
+
+static const OSSL_PARAM mlkem_key_types[] = {
+    MLKEM_KEY_TYPES(),
+    OSSL_PARAM_END
+};
+
+static const OSSL_PARAM *mlkem_imexport_types(int selection)
+{
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
+        return mlkem_key_types;
+    return NULL;
 }
 
 static int mlkem_get_params(void *key, OSSL_PARAM params[])
@@ -323,6 +493,10 @@ const OSSL_DISPATCH ossl_mlkem768_keymgmt_functions[] = {
     { OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, (void (*) (void))mlkem_settable_params },
     { OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))mlkem_has },
     { OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))mlkem_match },
+    { OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))mlkem_imexport_types },
+    { OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))mlkem_imexport_types },
+    { OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))mlkem_export },
+    { OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))mlkem_import },
     { OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))mlkem_gen_init },
     { OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS, (void (*)(void))mlkem_gen_set_params },
     { OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS,

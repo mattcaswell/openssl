@@ -32,6 +32,7 @@ typedef struct tls_group_constants_st {
 } TLS_GROUP_CONSTANTS;
 
 static const TLS_GROUP_CONSTANTS group_list[] = {
+/* re-activate when testing is done TODO */
 /*    { OSSL_TLS_GROUP_ID_sect163k1, 80, TLS1_VERSION, TLS1_2_VERSION,
       DTLS1_VERSION, DTLS1_2_VERSION, 0 },
     { OSSL_TLS_GROUP_ID_sect163r1, 80, TLS1_VERSION, TLS1_2_VERSION,
@@ -86,7 +87,7 @@ static const TLS_GROUP_CONSTANTS group_list[] = {
     { OSSL_TLS_GROUP_ID_brainpoolP512r1, 256, TLS1_VERSION, TLS1_2_VERSION,
       DTLS1_VERSION, DTLS1_2_VERSION, 0 },
 */
-    { OSSL_TLS_GROUP_ID_x25519, 128, TLS1_VERSION, 0, DTLS1_VERSION, 0, 1},
+    { OSSL_TLS_GROUP_ID_x25519, 128, TLS1_VERSION, 0, DTLS1_VERSION, 0, 0},
 /*
     { OSSL_TLS_GROUP_ID_x448, 224, TLS1_VERSION, 0, DTLS1_VERSION, 0, 0 },
     { OSSL_TLS_GROUP_ID_brainpoolP256r1_tls13, 128, TLS1_3_VERSION, 0, -1, -1, 0 },
