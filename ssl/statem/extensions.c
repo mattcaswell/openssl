@@ -1723,6 +1723,13 @@ static int final_early_data(SSL_CONNECTION *s, unsigned int context, int sent)
     } else {
         s->ext.early_data = SSL_EARLY_DATA_ACCEPTED;
 
+        /* QUIC also needs early data write keys for sending ACKs */
+        if (SSL_IS_QUIC_HANDSHAKE(s) && !tls13_change_cipher_state(s,
+            SSL3_CC_EARLY | SSL3_CHANGE_CIPHER_SERVER_WRITE)) {
+            /* SSLfatal() already called */
+            return 0;
+        }
+
         if (!tls13_change_cipher_state(s,
                     SSL3_CC_EARLY | SSL3_CHANGE_CIPHER_SERVER_READ)) {
             /* SSLfatal() already called */

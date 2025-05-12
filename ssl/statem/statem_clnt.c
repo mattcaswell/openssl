@@ -819,6 +819,12 @@ WORK_STATE ossl_statem_client_post_work(SSL_CONNECTION *s, WORK_STATE wst)
                     /* SSLfatal() already called */
                     return WORK_ERROR;
                 }
+                /* QUIC also needs early data read keys for reading ACKs */
+                if (SSL_IS_QUIC_HANDSHAKE(s) && !tls13_change_cipher_state(s,
+                    SSL3_CC_EARLY | SSL3_CHANGE_CIPHER_CLIENT_READ)) {
+                    /* SSLfatal() already called */
+                    return 0;
+                }
             }
             /* else we're in compat mode so we delay flushing until after CCS */
         } else if (!statem_flush(s)) {
@@ -851,6 +857,10 @@ WORK_STATE ossl_statem_client_post_work(SSL_CONNECTION *s, WORK_STATE wst)
              */
             if (!tls13_change_cipher_state(s,
                         SSL3_CC_EARLY | SSL3_CHANGE_CIPHER_CLIENT_WRITE))
+                return WORK_ERROR;
+                /* QUIC also needs early data read keys for reading ACKs */
+            if (SSL_IS_QUIC_HANDSHAKE(s) && !tls13_change_cipher_state(s,
+                    SSL3_CC_EARLY | SSL3_CHANGE_CIPHER_CLIENT_READ))
                 return WORK_ERROR;
             break;
         }
