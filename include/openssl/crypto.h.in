@@ -81,11 +81,32 @@ typedef struct {
 
 typedef void CRYPTO_RWLOCK;
 
+#define CRYPTO_EX_READ_LOCK 0
+#define OSSL_OBJ_READ_LOCK 1
+#define OSSL_PROPERTY_READ_LOCK 2
+#define DECODER_CACHE_READ_LOCK 3
+#define RAND_GET_METHOD_READ_LOCK 4
+#define DOALL_NAMES_READ_LOCK 5
+#define X509_STORE_READ_LOCK 6
+#define BN_MONT_CTX_READ_LOCK 7
+#define RSA_READ_LOCK 8
+#define X509_READ_LOCK 9
+#define OBJ_READ_LOCK 10
+#define SSL_CONNECTION_READ_LOCK 11
+#define SSL_SESSION_READ_LOCK 12
+#define SSL_SESSION_READ_LOCK2 13
+#define MAX_READ_LOCK_LOCATIONS 14
+#define MAX_READ_LOCK_LOCATIONS 14
+
 CRYPTO_RWLOCK *CRYPTO_THREAD_lock_new(void);
 __owur int CRYPTO_THREAD_read_lock(CRYPTO_RWLOCK *lock);
+__owur int CRYPTO_THREAD_read_lock_ex(CRYPTO_RWLOCK *lock, int location);
 __owur int CRYPTO_THREAD_write_lock(CRYPTO_RWLOCK *lock);
 int CRYPTO_THREAD_unlock(CRYPTO_RWLOCK *lock);
 void CRYPTO_THREAD_lock_free(CRYPTO_RWLOCK *lock);
+
+void CRYPTO_THREAD_start(void);
+void CRYPTO_THREAD_finish(void);
 
 int CRYPTO_atomic_add(int *val, int amount, int *ret, CRYPTO_RWLOCK *lock);
 int CRYPTO_atomic_add64(uint64_t *val, uint64_t op, uint64_t *ret,

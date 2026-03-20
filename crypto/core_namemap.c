@@ -120,7 +120,7 @@ int ossl_namemap_doall_names(const OSSL_NAMEMAP *namemap, int number,
      * the user function, so that we're not holding the read lock when in user
      * code. This could lead to deadlocks.
      */
-    if (!CRYPTO_THREAD_read_lock(namemap->lock))
+    if (!CRYPTO_THREAD_read_lock_ex(namemap->lock, DOALL_NAMES_READ_LOCK))
         return 0;
 
     names = sk_NAMES_value(namemap->numnames, number - 1);

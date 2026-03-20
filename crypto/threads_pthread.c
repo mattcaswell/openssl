@@ -949,8 +949,66 @@ CRYPTO_RWLOCK *CRYPTO_THREAD_lock_new(void)
     return lock;
 }
 
+int rdlockctr = -1;
+int rdlockctrs[MAX_READ_LOCK_LOCATIONS];
+
+void CRYPTO_THREAD_start(void)
+{
+    rdlockctr = 0;
+}
+
+void CRYPTO_THREAD_finish(void)
+{
+    int i;
+    const char *locknames[MAX_READ_LOCK_LOCATIONS] = {
+        "CRYPTO_EX_READ_LOCK",
+        "OSSL_OBJ_READ_LOCK",
+        "OSSL_PROPERTY_READ_LOCK",
+        "DECODER_CACHE_READ_LOCK",
+        "RAND_GET_METHOD_READ_LOCK",
+        "DOALL_NAMES_READ_LOCK",
+        "X509_STORE_READ_LOCK",
+        "BN_MONT_CTX_READ_LOCK",
+        "RSA_READ_LOCK",
+        "X509_READ_LOCK",
+        "OBJ_READ_LOCK",
+        "SSL_CONNECTION_READ_LOCK",
+        "SSL_SESSION_READ_LOCK",
+        "SSL_SESSION_READ_LOCK2"
+    };
+
+    fprintf(stderr, "rdlockctr: %d\n", rdlockctr);
+    for (i = 0; i < MAX_READ_LOCK_LOCATIONS; i++)
+        fprintf(stderr, "%s: %d (%d%%)\n", locknames[i], rdlockctrs[i], rdlockctr != 0 ? (rdlockctrs[i] * 100 / rdlockctr) : 0);
+}
+
+__owur int CRYPTO_THREAD_read_lock_ex(CRYPTO_RWLOCK *lock, int location)
+{
+    if (rdlockctr >= 0) {
+        rdlockctr++;
+
+        if (location >= 0 && location < MAX_READ_LOCK_LOCATIONS)
+            rdlockctrs[location]++;
+    }
+
+#ifdef USE_RWLOCK
+    if (!ossl_assert(ossl_rwlock_rdlock(lock) == 0))
+        return 0;
+#else
+    if (pthread_mutex_lock(lock) != 0) {
+        assert(errno != EDEADLK && errno != EBUSY);
+        return 0;
+    }
+#endif
+
+    return 1;
+}
+
 __owur int CRYPTO_THREAD_read_lock(CRYPTO_RWLOCK *lock)
 {
+    if (rdlockctr >= 0)
+        rdlockctr++;
+
 #ifdef USE_RWLOCK
     if (!ossl_assert(ossl_rwlock_rdlock(lock) == 0))
         return 0;

@@ -272,7 +272,7 @@ static BN_BLINDING *rsa_get_blinding(RSA *rsa, BN_CTX *ctx)
 {
     BN_BLINDING *ret;
 
-    if (!CRYPTO_THREAD_read_lock(rsa->lock))
+    if (!CRYPTO_THREAD_read_lock_ex(rsa->lock, RSA_READ_LOCK))
         return NULL;
 
     ret = ossl_rsa_get_thread_bn_blinding(rsa);

@@ -50,7 +50,7 @@ int X509_STORE_lock(X509_STORE *xs)
 
 int ossl_x509_store_read_lock(X509_STORE *xs)
 {
-    return CRYPTO_THREAD_read_lock(xs->lock);
+    return CRYPTO_THREAD_read_lock_ex(xs->lock, X509_STORE_READ_LOCK);
 }
 
 int X509_STORE_unlock(X509_STORE *xs)

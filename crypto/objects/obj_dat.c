@@ -102,7 +102,7 @@ static ossl_inline int ossl_obj_read_lock(void)
 {
     if (!ossl_init_added_api())
         return 0;
-    return CRYPTO_THREAD_read_lock(ossl_obj_lock);
+    return CRYPTO_THREAD_read_lock_ex(ossl_obj_lock, OSSL_OBJ_READ_LOCK);
 }
 
 static ossl_inline void ossl_obj_unlock(void)

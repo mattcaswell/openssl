@@ -255,7 +255,7 @@ const RAND_METHOD *RAND_get_rand_method(void)
     if (rand_meth_lock == NULL)
         return NULL;
 
-    if (!CRYPTO_THREAD_read_lock(rand_meth_lock))
+    if (!CRYPTO_THREAD_read_lock_ex(rand_meth_lock, RAND_GET_METHOD_READ_LOCK))
         return NULL;
     tmp_meth = default_RAND_meth;
     CRYPTO_THREAD_unlock(rand_meth_lock);

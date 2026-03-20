@@ -47,7 +47,7 @@ static EX_CALLBACKS *get_and_lock(OSSL_EX_DATA_GLOBAL *global, int class_index,
     }
 
     if (read) {
-        if (!CRYPTO_THREAD_read_lock(global->ex_data_lock))
+        if (!CRYPTO_THREAD_read_lock_ex(global->ex_data_lock, CRYPTO_EX_READ_LOCK))
             return NULL;
     } else {
         if (!CRYPTO_THREAD_write_lock(global->ex_data_lock))

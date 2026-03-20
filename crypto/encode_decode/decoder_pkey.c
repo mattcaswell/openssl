@@ -863,7 +863,7 @@ OSSL_DECODER_CTX_new_for_pkey(EVP_PKEY **pkey,
     cacheent.selection = selection;
     cacheent.propquery = (char *)propquery;
 
-    if (!CRYPTO_THREAD_read_lock(cache->lock)) {
+    if (!CRYPTO_THREAD_read_lock_ex(cache->lock, DECODER_CACHE_READ_LOCK)) {
         ERR_raise(ERR_LIB_OSSL_DECODER, ERR_R_CRYPTO_LIB);
         return NULL;
     }

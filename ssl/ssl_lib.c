@@ -1103,7 +1103,7 @@ int SSL_has_matching_session_id(const SSL *ssl, const unsigned char *id,
     r.session_id_length = id_len;
     memcpy(r.session_id, id, id_len);
 
-    if (!CRYPTO_THREAD_read_lock(sc->session_ctx->lock))
+    if (!CRYPTO_THREAD_read_lock_ex(sc->session_ctx->lock, SSL_SESSION_READ_LOCK2))
         return 0;
     p = lh_SSL_SESSION_retrieve(sc->session_ctx->sessions, &r);
     CRYPTO_THREAD_unlock(sc->session_ctx->lock);

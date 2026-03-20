@@ -428,7 +428,7 @@ BN_MONT_CTX *BN_MONT_CTX_set_locked(BN_MONT_CTX **pmont, CRYPTO_RWLOCK *lock,
 {
     BN_MONT_CTX *ret;
 
-    if (!CRYPTO_THREAD_read_lock(lock))
+    if (!CRYPTO_THREAD_read_lock_ex(lock, BN_MONT_CTX_READ_LOCK))
         return NULL;
     ret = *pmont;
     CRYPTO_THREAD_unlock(lock);

@@ -234,7 +234,7 @@ static void ossl_method_free(METHOD *method)
 
 static __owur int ossl_property_read_lock(STORED_ALGORITHMS *p)
 {
-    return p != NULL ? CRYPTO_THREAD_read_lock(p->lock) : 0;
+    return p != NULL ? CRYPTO_THREAD_read_lock_ex(p->lock, OSSL_PROPERTY_READ_LOCK) : 0;
 }
 
 static __owur int ossl_property_write_lock(STORED_ALGORITHMS *p)

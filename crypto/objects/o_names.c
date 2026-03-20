@@ -159,7 +159,7 @@ const char *OBJ_NAME_get(const char *name, int type)
         return NULL;
     if (!OBJ_NAME_init())
         return NULL;
-    if (!CRYPTO_THREAD_read_lock(obj_lock))
+    if (!CRYPTO_THREAD_read_lock_ex(obj_lock, OBJ_READ_LOCK))
         return NULL;
 
     alias = type & OBJ_NAME_ALIAS;

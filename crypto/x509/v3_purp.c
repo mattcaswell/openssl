@@ -555,7 +555,7 @@ int ossl_x509v3_cache_extensions(const X509 *const_x)
         return (const_x->ex_flags & EXFLAG_INVALID) == 0;
 #endif
 
-    if (!CRYPTO_THREAD_read_lock(const_x->lock))
+    if (!CRYPTO_THREAD_read_lock_ex(const_x->lock, X509_READ_LOCK))
         return 0;
     tmp_ex_flags = const_x->ex_flags;
     tmp_ex_pcpathlen = const_x->ex_pcpathlen;
