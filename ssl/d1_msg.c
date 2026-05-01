@@ -24,13 +24,13 @@ int dtls1_write_app_data_bytes(SSL *s, uint8_t type, const void *buf_,
         if (i < 0)
             return i;
         if (i == 0) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_SSL_HANDSHAKE_FAILURE);
+            ERR_raise(ERR_LIB_SSL, ERR_R_HANDSHAKE_FAILURE);
             return -1;
         }
     }
 
     if (len > SSL3_RT_MAX_PLAIN_LENGTH) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_DTLS_MESSAGE_TOO_BIG);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
         return -1;
     }
 

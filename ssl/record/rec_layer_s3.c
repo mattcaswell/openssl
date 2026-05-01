@@ -129,7 +129,7 @@ static uint32_t ossl_get_max_early_data(SSL_CONNECTION *s)
     if (!s->server && sess->ext.max_early_data == 0) {
         if (!ossl_assert(s->psksession != NULL
                 && s->psksession->ext.max_early_data > 0)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "unexpected NULL psksession for early data");
             return 0;
         }
         sess = s->psksession;
@@ -155,8 +155,7 @@ static int ossl_early_data_count_ok(SSL_CONNECTION *s, size_t length,
     max_early_data = ossl_get_max_early_data(s);
 
     if (max_early_data == 0) {
-        SSLfatal(s, send ? SSL_AD_INTERNAL_ERROR : SSL_AD_UNEXPECTED_MESSAGE,
-            SSL_R_TOO_MUCH_EARLY_DATA);
+        SSLfatal_data(s, send ? SSL_AD_INTERNAL_ERROR : SSL_AD_UNEXPECTED_MESSAGE, ERR_R_INVALID_LENGTH, "invalid length in ossl early data count ok");
         return 0;
     }
 
@@ -164,8 +163,7 @@ static int ossl_early_data_count_ok(SSL_CONNECTION *s, size_t length,
     max_early_data += (uint32_t)overhead;
 
     if (s->early_data_count + length > max_early_data) {
-        SSLfatal(s, send ? SSL_AD_INTERNAL_ERROR : SSL_AD_UNEXPECTED_MESSAGE,
-            SSL_R_TOO_MUCH_EARLY_DATA);
+        SSLfatal_data(s, send ? SSL_AD_INTERNAL_ERROR : SSL_AD_UNEXPECTED_MESSAGE, ERR_R_INVALID_LENGTH, "invalid length in ossl early data count ok");
         return 0;
     }
     s->early_data_count += (uint32_t)length;
@@ -260,7 +258,7 @@ static int tls_write_check_pending(SSL_CONNECTION *s, uint8_t type,
         || (!(s->mode & SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER)
             && (s->rlayer.wpend_buf != buf))
         || (s->rlayer.wpend_type != type)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_WRITE_RETRY);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_WRONG_STATE, "write pending state mismatch (buffer, length, or type)");
         return -1;
     }
     return 1;
@@ -290,7 +288,7 @@ int ssl3_write_bytes(SSL *ssl, uint8_t type, const void *buf_, size_t len,
      * ensure that if we end up with a smaller value of data to write out
      * than the original len from a write which didn't complete for
      * non-blocking I/O and also somehow ended up avoiding the check for
-     * this in tls_write_check_pending/SSL_R_BAD_WRITE_RETRY as it must never be
+     * this in tls_write_check_pending/ERR_R_WRONG_STATE as it must never be
      * possible to end up with (len-tot) as a large number that will then
      * promptly send beyond the end of the users buffer ... so we trap and
      * report the error in a way the user will notice
@@ -298,7 +296,7 @@ int ssl3_write_bytes(SSL *ssl, uint8_t type, const void *buf_, size_t len,
     if ((len < s->rlayer.wnum)
         || ((s->rlayer.wpend_tot != 0)
             && (len < (s->rlayer.wnum + s->rlayer.wpend_tot)))) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_LENGTH);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_LENGTH, "write length smaller than already written data");
         return -1;
     }
 
@@ -388,7 +386,7 @@ int ssl3_write_bytes(SSL *ssl, uint8_t type, const void *buf_, size_t len,
          * We should have prevented this when we set/get the split and max send
          * fragments so we shouldn't get here
          */
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "invalid send fragment parameters (split > max)");
         return -1;
     }
 
@@ -427,7 +425,7 @@ int ssl3_write_bytes(SSL *ssl, uint8_t type, const void *buf_, size_t len,
             maxpipes = SSL_MAX_PIPELINES;
 
         if (split_send_fragment > max_send_fragment) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "split_send_fragment exceeds max_send_fragment");
             return -1;
         }
 
@@ -520,7 +518,7 @@ int ossl_tls_handle_rlayer_return(SSL_CONNECTION *s, int writing, int ret,
                  * applications for control flow decisions.
                  */
                 ossl_statem_fatal(s, SSL_AD_DECODE_ERROR,
-                    SSL_R_UNEXPECTED_EOF_WHILE_READING, NULL);
+                    ERR_R_UNEXPECTED_EOF, NULL);
             }
         } else if (ret == OSSL_RECORD_RETURN_FATAL) {
             int al = s->rlayer.rrlmethod->get_alert_code(s->rlayer.rrl);
@@ -528,7 +526,7 @@ int ossl_tls_handle_rlayer_return(SSL_CONNECTION *s, int writing, int ret,
             if (al != SSL_AD_NO_ALERT) {
                 ERR_new();
                 ERR_set_debug(file, line, 0);
-                ossl_statem_fatal(s, al, SSL_R_RECORD_LAYER_FAILURE, NULL);
+                ossl_statem_fatal(s, al, ERR_R_INTERNAL_ERROR, NULL);
             } else {
                 /*
                  * Some failure but there is no alert code. We don't log an
@@ -641,7 +639,7 @@ int ssl3_read_bytes(SSL *ssl, uint8_t type, uint8_t *recvd_type,
             && (type != SSL3_RT_APPLICATION_DATA)
             && (type != SSL3_RT_HANDSHAKE))
         || (peek && (type != SSL3_RT_APPLICATION_DATA))) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "invalid record type or peek mode for ssl3_read");
         return -1;
     }
 
@@ -720,8 +718,7 @@ start:
     if (s->rlayer.handshake_fragment_len > 0
         && rr->type != SSL3_RT_HANDSHAKE
         && SSL_CONNECTION_IS_TLS13(s)) {
-        SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE,
-            SSL_R_MIXED_HANDSHAKE_AND_NON_HANDSHAKE_DATA);
+        SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_PROTOCOL_ERROR, "protocol error in read bytes");
         return -1;
     }
 
@@ -737,8 +734,7 @@ start:
     if (s->s3.change_cipher_spec /* set when we receive ChangeCipherSpec,
                                   * reset by ssl3_get_finished */
         && (rr->type != SSL3_RT_HANDSHAKE)) {
-        SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE,
-            SSL_R_DATA_BETWEEN_CCS_AND_FINISHED);
+        SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_PROTOCOL_ERROR, "protocol error in read bytes");
         return -1;
     }
 
@@ -767,14 +763,14 @@ start:
          */
         if (SSL_in_init(ssl) && type == SSL3_RT_APPLICATION_DATA
             && SSL_IS_FIRST_HANDSHAKE(s)) {
-            SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_APP_DATA_IN_HANDSHAKE);
+            SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "received app data during handshake");
             return -1;
         }
 
         if (type == SSL3_RT_HANDSHAKE
             && rr->type == SSL3_RT_CHANGE_CIPHER_SPEC
             && s->rlayer.handshake_fragment_len > 0) {
-            SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_CCS_RECEIVED_EARLY);
+            SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "received CCS before handshake started");
             return -1;
         }
 
@@ -844,7 +840,7 @@ start:
          * initial ClientHello. Therefore |type| should always be equal to
          * |rr->type|. If not then something has gone horribly wrong
          */
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to allocate or grow init_buf for message");
         return -1;
     }
 
@@ -857,7 +853,7 @@ start:
          * if we are a server.
          */
         s->version = rr->version;
-        SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_UNEXPECTED_MESSAGE);
+        SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "received unexpected handshake message");
         return -1;
     }
 
@@ -875,7 +871,7 @@ start:
             || !PACKET_get_1(&alert, &alert_level)
             || !PACKET_get_1(&alert, &alert_descr)
             || PACKET_remaining(&alert) != 0) {
-            SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_INVALID_ALERT);
+            SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_PASSED_INVALID_ARGUMENT, "failed to parse alert record");
             return -1;
         }
 
@@ -901,8 +897,7 @@ start:
 
             s->rlayer.alert_count++;
             if (s->rlayer.alert_count == MAX_WARN_ALERT_COUNT) {
-                SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE,
-                    SSL_R_TOO_MANY_WARN_ALERTS);
+                SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_OVERFLOW, "overflow in read bytes");
                 return -1;
             }
         }
@@ -937,14 +932,14 @@ start:
              * the future we might have a renegotiation where we don't care
              * if the peer refused it where we carry on.
              */
-            SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_NO_RENEGOTIATION);
+            SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_UNSUPPORTED, "peer refused renegotiation");
             return -1;
         } else if (alert_level == SSL3_AL_WARNING) {
             /* We ignore any other warning alert in TLSv1.2 and below */
             goto start;
         }
 
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_UNKNOWN_ALERT_TYPE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_UNKNOWN, "unknown alert type received from peer");
         return -1;
     }
 
@@ -982,8 +977,7 @@ start:
              */
             if (!ssl_release_record(s, rr, 0))
                 return -1;
-            SSLfatal(s, SSL_AD_NO_ALERT,
-                SSL_R_APPLICATION_DATA_AFTER_CLOSE_NOTIFY);
+            SSLfatal_data(s, SSL_AD_NO_ALERT, ERR_R_WRONG_STATE, "wrong state in read bytes");
             return -1;
         }
     }
@@ -1020,7 +1014,7 @@ start:
     }
 
     if (rr->type == SSL3_RT_CHANGE_CIPHER_SPEC) {
-        SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_CCS_RECEIVED_EARLY);
+        SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "received unexpected CCS in TLS 1.3");
         return -1;
     }
 
@@ -1079,7 +1073,7 @@ start:
          * no progress is being made and the peer continually sends unrecognised
          * record types, using up resources processing them.
          */
-        SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_UNEXPECTED_RECORD);
+        SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "received unexpected record type");
         return -1;
     case SSL3_RT_CHANGE_CIPHER_SPEC:
     case SSL3_RT_ALERT:
@@ -1089,7 +1083,7 @@ start:
          * SSL3_RT_HANDSHAKE when ossl_statem_get_in_handshake(s) is true, but
          * that should not happen when type != rr->type
          */
-        SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_INTERNAL_ERROR, "unexpected handshake data when expecting app data");
         return -1;
     case SSL3_RT_APPLICATION_DATA:
         /*
@@ -1121,7 +1115,7 @@ start:
                 return -1;
             goto start;
         } else {
-            SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_UNEXPECTED_RECORD);
+            SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "received app data when expecting handshake");
             return -1;
         }
     }
@@ -1268,7 +1262,7 @@ int ssl_set_new_record_layer(SSL_CONNECTION *s, int version,
                  * normal circumstances. The CCS must have arrived early, but
                  * this remaining record data is unexpected.
                  */
-                SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_UNEXPECTED_MESSAGE);
+                SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "received unexpected record during handshake read");
                 return 0;
             }
         } else {
@@ -1278,7 +1272,7 @@ int ssl_set_new_record_layer(SSL_CONNECTION *s, int version,
                  * record layer - but that should only happen on a record
                  * boundary. We should never be able to get here.
                  */
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ssl_set_new_record_layer");
                 return 0;
             }
         }
@@ -1407,7 +1401,7 @@ int ssl_set_new_record_layer(SSL_CONNECTION *s, int version,
                 next = BIO_new(BIO_s_mem());
 
             if (next == NULL) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "dtls1_process_record failed");
                 return 0;
             }
             s->rlayer.rrlnext = next;
@@ -1448,7 +1442,7 @@ int ssl_set_new_record_layer(SSL_CONNECTION *s, int version,
         BIO_free(prev);
         switch (rlret) {
         case OSSL_RECORD_RETURN_FATAL:
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_RECORD_LAYER_FAILURE);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "record layer failure");
             return 0;
 
         case OSSL_RECORD_RETURN_NON_FATAL_ERR:
@@ -1460,7 +1454,7 @@ int ssl_set_new_record_layer(SSL_CONNECTION *s, int version,
                 meth = *thismethod;
                 continue;
             }
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_NO_SUITABLE_RECORD_LAYER);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_UNSUPPORTED, "no suitable record layer method available");
             return 0;
 
         case OSSL_RECORD_RETURN_SUCCESS:
@@ -1468,7 +1462,7 @@ int ssl_set_new_record_layer(SSL_CONNECTION *s, int version,
 
         default:
             /* Should not happen */
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to increment sequence number");
             return 0;
         }
         break;
@@ -1485,7 +1479,7 @@ int ssl_set_new_record_layer(SSL_CONNECTION *s, int version,
         || direction == OSSL_RECORD_DIRECTION_READ
         || pqueue_peek(s->d1->sent_messages) == NULL) {
         if (*thismethod != NULL && !(*thismethod)->free(*thisrl)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to set plaintext length or allocate memory for record");
             return 0;
         }
     }

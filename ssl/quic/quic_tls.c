@@ -165,7 +165,7 @@ quic_new_record_layer(OSSL_LIB_CTX *libctx, const char *propq, int vers,
         } else if (EVP_CIPHER_is_a(ciph, "CHACHA20-POLY1305")) {
             suite_id = QRL_SUITE_CHACHA20POLY1305;
         } else {
-            QUIC_TLS_FATAL(rl, SSL_AD_INTERNAL_ERROR, SSL_R_UNKNOWN_CIPHER_TYPE);
+            QUIC_TLS_FATAL(rl, SSL_AD_INTERNAL_ERROR, ERR_R_UNKNOWN);
             goto err;
         }
 
@@ -295,7 +295,7 @@ static int quic_write_records(OSSL_RECORD_LAYER *rl,
              * us in one go, and never fragments it. If we ever get more
              * or less bytes than exactly 2 then this is very unexpected.
              */
-            QUIC_TLS_FATAL(rl, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_VALUE);
+            QUIC_TLS_FATAL(rl, SSL_AD_INTERNAL_ERROR, ERR_R_PASSED_INVALID_ARGUMENT);
             return OSSL_RECORD_RETURN_FATAL;
         }
         /*
@@ -677,7 +677,7 @@ static int raise_error(QUIC_TLS *qtls, uint64_t error_code,
      */
     ERR_new();
     ERR_set_debug(src_file, src_line, src_func);
-    ERR_set_error(ERR_LIB_SSL, SSL_R_QUIC_HANDSHAKE_LAYER_ERROR,
+    ERR_set_error(ERR_LIB_SSL, ERR_R_HANDSHAKE_FAILURE,
         "handshake layer error, error code %llu (0x%llx) (\"%s\")",
         error_code, error_code, error_msg);
 

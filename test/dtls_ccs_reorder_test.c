@@ -508,7 +508,7 @@ static int test_dtls_data_after_ccs(void)
         goto end;
     if (!TEST_int_eq(SSL_get_error(sssl, ret), SSL_ERROR_SSL))
         goto end;
-    if (!TEST_int_eq(ERR_GET_REASON(ERR_get_error()), SSL_R_UNEXPECTED_MESSAGE))
+    if (!TEST_int_eq(ERR_GET_REASON(ERR_get_error()), ERR_R_WRONG_STATE))
         goto end;
 
     testresult = 1;

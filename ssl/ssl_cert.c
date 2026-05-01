@@ -983,7 +983,7 @@ int SSL_add_dir_cert_subjects_to_stack(STACK_OF(X509_NAME) *stack,
             continue;
 #endif
         if (strlen(dir) + strlen(filename) + 2 > sizeof(buf)) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_PATH_TOO_LONG);
+            ERR_raise(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT);
             goto err;
         }
 #ifdef OPENSSL_SYS_VMS
@@ -1101,7 +1101,7 @@ int ssl_build_cert_chain(SSL_CONNECTION *s, SSL_CTX *ctx, int flags)
     int i, rv = 0;
 
     if (cpk->x509 == NULL) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_NO_CERTIFICATE_SET);
+        ERR_raise(ERR_LIB_SSL, ERR_R_MISSING_REQUIRED_DATA);
         goto err;
     }
     /* Rearranging and check the chain: add everything to a store */
@@ -1151,7 +1151,7 @@ int ssl_build_cert_chain(SSL_CONNECTION *s, SSL_CTX *ctx, int flags)
         chain = X509_STORE_CTX_get1_chain(xs_ctx);
     if (i <= 0) {
         i = X509_STORE_CTX_get_error(xs_ctx);
-        ERR_raise_data(ERR_LIB_SSL, SSL_R_CERTIFICATE_VERIFY_FAILED,
+        ERR_raise_data(ERR_LIB_SSL, ERR_R_CERTIFICATE_VERIFICATION_FAILED,
             "Verify error:%s", X509_verify_cert_error_string(i));
 
         goto err;

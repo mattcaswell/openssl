@@ -260,18 +260,18 @@ static int tls13_validate_record_header(OSSL_RECORD_LAYER *rl,
         && (rec->type != SSL3_RT_CHANGE_CIPHER_SPEC
             || !rl->is_first_handshake)
         && (rec->type != SSL3_RT_ALERT || !rl->allow_plain_alerts)) {
-        RLAYERfatal(rl, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_BAD_RECORD_TYPE);
+        RLAYERfatal(rl, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_PROTOCOL_ERROR);
         return 0;
     }
 
     if (rec->rec_version != TLS1_2_VERSION) {
-        RLAYERfatal(rl, SSL_AD_DECODE_ERROR, SSL_R_WRONG_VERSION_NUMBER);
+        RLAYERfatal(rl, SSL_AD_DECODE_ERROR, ERR_R_MISMATCH);
         return 0;
     }
 
     if (rec->length > SSL3_RT_MAX_TLS13_ENCRYPTED_LENGTH) {
         RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW,
-            SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
+            ERR_R_INVALID_LENGTH);
         return 0;
     }
     return 1;
@@ -286,7 +286,7 @@ static int tls13_post_process_record(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *rec)
         if (rec->length == 0
             || rec->type != SSL3_RT_APPLICATION_DATA) {
             RLAYERfatal(rl, SSL_AD_UNEXPECTED_MESSAGE,
-                SSL_R_BAD_RECORD_TYPE);
+                ERR_R_PROTOCOL_ERROR);
             return 0;
         }
 
@@ -299,7 +299,7 @@ static int tls13_post_process_record(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *rec)
     }
 
     if (rec->length > SSL3_RT_MAX_PLAIN_LENGTH) {
-        RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, SSL_R_DATA_LENGTH_TOO_LONG);
+        RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, ERR_R_INVALID_LENGTH);
         return 0;
     }
 

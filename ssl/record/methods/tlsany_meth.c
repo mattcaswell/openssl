@@ -54,21 +54,21 @@ static int tls_validate_record_header(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *rec)
                  */
                 p = rl->packet;
                 if (HAS_PREFIX((char *)p, "GET ") || HAS_PREFIX((char *)p, "POST ") || HAS_PREFIX((char *)p, "HEAD ") || HAS_PREFIX((char *)p, "PATCH") || HAS_PREFIX((char *)p, "OPTIO") || HAS_PREFIX((char *)p, "DELET") || HAS_PREFIX((char *)p, "TRACE") || HAS_PREFIX((char *)p, "PUT ")) {
-                    RLAYERfatal(rl, SSL_AD_NO_ALERT, SSL_R_HTTP_REQUEST);
+                    RLAYERfatal(rl, SSL_AD_NO_ALERT, ERR_R_PROTOCOL_ERROR);
                     return 0;
                 } else if (HAS_PREFIX((char *)p, "CONNE")) {
                     RLAYERfatal(rl, SSL_AD_NO_ALERT,
-                        SSL_R_HTTPS_PROXY_REQUEST);
+                        ERR_R_PROTOCOL_ERROR);
                     return 0;
                 }
 
                 /* Doesn't look like TLS - don't send an alert */
                 RLAYERfatal(rl, SSL_AD_NO_ALERT,
-                    SSL_R_WRONG_VERSION_NUMBER);
+                    ERR_R_MISMATCH);
                 return 0;
             } else {
                 RLAYERfatal(rl, SSL_AD_PROTOCOL_VERSION,
-                    SSL_R_WRONG_VERSION_NUMBER);
+                    ERR_R_MISMATCH);
                 return 0;
             }
         }
@@ -90,24 +90,24 @@ static int tls_validate_record_header(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *rec)
                  * end.
                  */
                 RLAYERfatal(rl, SSL_AD_NO_ALERT,
-                    SSL_R_WRONG_VERSION_NUMBER);
+                    ERR_R_MISMATCH);
                 return 0;
             }
             /* Send back error using their minor version number */
             rl->version = (unsigned short)rec->rec_version;
         }
         RLAYERfatal(rl, SSL_AD_PROTOCOL_VERSION,
-            SSL_R_WRONG_VERSION_NUMBER);
+            ERR_R_MISMATCH);
         return 0;
     }
 
     if (rec->length > SSL3_RT_MAX_PLAIN_LENGTH) {
         /*
-         * We use SSL_R_DATA_LENGTH_TOO_LONG instead of
-         * SSL_R_ENCRYPTED_LENGTH_TOO_LONG here because we are the "any" method
+         * We use ERR_R_INVALID_LENGTH instead of
+         * ERR_R_INVALID_LENGTH here because we are the "any" method
          * and we know that we are dealing with plaintext data
          */
-        RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, SSL_R_DATA_LENGTH_TOO_LONG);
+        RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, ERR_R_INVALID_LENGTH);
         return 0;
     }
     return 1;

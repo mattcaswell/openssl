@@ -301,12 +301,12 @@ int ossl_ech_send_grease(SSL_CONNECTION *s, WPACKET *pkt)
     SSL_CTX *sctx = SSL_CONNECTION_GET_CTX(s);
 
     if (!WPACKET_get_total_written(pkt, &pp_at_start)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_send_grease");
         return 0;
     }
     /* randomly select cipher_len to be one of 144, 176, 208, 244 */
     if (RAND_bytes_ex(sctx->libctx, &cid, 1, 0) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_send_grease");
         return 0;
     }
     cipher_len_jitter = cid % 4;
@@ -314,14 +314,14 @@ int ossl_ech_send_grease(SSL_CONNECTION *s, WPACKET *pkt)
     cipher_len += 32 * cipher_len_jitter;
     /* generate a random (1 octet) client id */
     if (RAND_bytes_ex(sctx->libctx, &cid, 1, 0) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_send_grease");
         return 0;
     }
     s->ext.ech.attempted_cid = cid;
     hpke_suite_in_p = &hpke_suite;
     if (s->ext.ech.grease_suite != NULL) {
         if (OSSL_HPKE_str2suite(s->ext.ech.grease_suite, &hpke_suite_in) != 1) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_send_grease");
             return 0;
         }
         hpke_suite_in_p = &hpke_suite_in;
@@ -331,7 +331,7 @@ int ossl_ech_send_grease(SSL_CONNECTION *s, WPACKET *pkt)
             cipher, cipher_len,
             sctx->libctx, sctx->propq)
         != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_send_grease");
         return 0;
     }
     if (!WPACKET_put_bytes_u16(pkt, s->ext.ech.attempted_type)
@@ -343,20 +343,20 @@ int ossl_ech_send_grease(SSL_CONNECTION *s, WPACKET *pkt)
         || !WPACKET_sub_memcpy_u16(pkt, senderpub, senderpub_len)
         || !WPACKET_sub_memcpy_u16(pkt, cipher, cipher_len)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_send_grease");
         return 0;
     }
     /* record the ECH sent so we can re-tx same if we hit an HRR */
     OPENSSL_free(s->ext.ech.sent);
     if (!WPACKET_get_total_written(pkt, &pp_at_end)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_send_grease");
         return 0;
     }
     s->ext.ech.sent_len = pp_at_end - pp_at_start;
     s->ext.ech.sent = OPENSSL_malloc(s->ext.ech.sent_len);
     if (s->ext.ech.sent == NULL) {
         s->ext.ech.sent_len = 0;
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_send_grease");
         return 0;
     }
     memcpy(s->ext.ech.sent, WPACKET_get_curr(pkt) - s->ext.ech.sent_len,
@@ -462,7 +462,7 @@ int ossl_ech_encode_inner(SSL_CONNECTION *s, unsigned char **encoded,
     if (s == NULL)
         return 0;
     if (s->ext.ech.es == NULL || s->clienthello == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_encode_inner");
         return 0;
     }
     if ((inner_mem = BUF_MEM_new()) == NULL
@@ -482,19 +482,19 @@ int ossl_ech_encode_inner(SSL_CONNECTION *s, unsigned char **encoded,
         /* Add the NULL compression method */
         || !WPACKET_put_bytes_u8(&inner, 0)
         || !WPACKET_close(&inner)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_encode_inner");
         goto err;
     }
     /* Now handle extensions */
     if (!WPACKET_start_sub_packet_u16(&inner)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_encode_inner");
         goto err;
     }
     /* Grab a pointer to the already constructed extensions */
     raws = s->clienthello->pre_proc_exts;
     nraws = s->clienthello->pre_proc_exts_len;
     if (raws == NULL || nraws < TLSEXT_IDX_num_builtins) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_encode_inner");
         goto err;
     }
     /*  We put ECH-compressed stuff first (if any), because we can */
@@ -503,19 +503,19 @@ int ossl_ech_encode_inner(SSL_CONNECTION *s, unsigned char **encoded,
             || !WPACKET_start_sub_packet_u16(&inner)
             /* redundant encoding of more-or-less the same thing */
             || !WPACKET_start_sub_packet_u8(&inner)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_encode_inner");
             goto err;
         }
         /* add the types for each of the compressed extensions now */
         for (ind = 0; ind != s->ext.ech.n_outer_only; ind++) {
             if (!WPACKET_put_bytes_u16(&inner, s->ext.ech.outer_only[ind])) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_encode_inner");
                 goto err;
             }
         }
         /* close the 2 sub-packets with the compressed types */
         if (!WPACKET_close(&inner) || !WPACKET_close(&inner)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_encode_inner");
             goto err;
         }
     }
@@ -526,13 +526,13 @@ int ossl_ech_encode_inner(SSL_CONNECTION *s, unsigned char **encoded,
         if (!WPACKET_put_bytes_u16(&inner, raws[ind].type)
             || !WPACKET_sub_memcpy_u16(&inner, PACKET_data(&raws[ind].data),
                 PACKET_remaining(&raws[ind].data))) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_encode_inner");
             goto err;
         }
     }
     if (!WPACKET_close(&inner) /* close the encoded inner packet */
         || !WPACKET_get_length(&inner, &innerlen)) { /* len for inner CH */
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_encode_inner");
         goto err;
     }
     *encoded = (unsigned char *)inner_mem->data;
@@ -695,7 +695,7 @@ int ossl_ech_aad_and_encrypt(SSL_CONNECTION *s, WPACKET *pkt)
         return 0;
     if (s->ext.ech.es == NULL || s->ext.ech.es->entries == NULL
         || pkt == NULL || s->ssl.ctx == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_aad_and_encrypt");
         goto err;
     }
     /* values calculated in tls_construct_ctos_ech */
@@ -704,7 +704,7 @@ int ossl_ech_aad_and_encrypt(SSL_CONNECTION *s, WPACKET *pkt)
     clear_len = s->ext.ech.clearlen;
     cipherlen = s->ext.ech.cipherlen;
     if (!WPACKET_get_total_written(pkt, &aad_len) || aad_len < 4) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_aad_and_encrypt");
         goto err;
     }
     aad_len -= 4; /* ECH/HPKE aad starts after type + 3-octet len */
@@ -718,7 +718,7 @@ int ossl_ech_aad_and_encrypt(SSL_CONNECTION *s, WPACKET *pkt)
      * towards the end
      */
     if (!WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_aad_and_encrypt");
         goto err;
     }
 #ifdef OSSL_ECH_SUPERVERBOSE
@@ -726,7 +726,7 @@ int ossl_ech_aad_and_encrypt(SSL_CONNECTION *s, WPACKET *pkt)
 #endif
     clear = OPENSSL_zalloc(clear_len); /* zeros incl. padding */
     if (clear == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_aad_and_encrypt");
         goto err;
     }
     memcpy(clear, encoded_inner, encoded_inner_len);
@@ -740,7 +740,7 @@ int ossl_ech_aad_and_encrypt(SSL_CONNECTION *s, WPACKET *pkt)
         &cipherlen, aad, aad_len, clear, clear_len);
     OPENSSL_free(clear);
     if (rv != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_aad_and_encrypt");
         goto err;
     }
 #ifdef OSSL_ECH_SUPERVERBOSE
@@ -839,7 +839,7 @@ int ossl_ech_swaperoo(SSL_CONNECTION *s)
 #endif
     /* un-stash inner key share(s) */
     if (ossl_ech_unstash_keyshares(s) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_swaperoo");
         return 0;
     }
     /*
@@ -858,12 +858,12 @@ int ossl_ech_swaperoo(SSL_CONNECTION *s)
 
         s->s3.handshake_buffer = NULL;
         if (ssl3_init_finished_mac(s) == 0) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_swaperoo");
             BIO_free(handbuf);
             return 0;
         }
         if (ssl3_finish_mac(s, s->ext.ech.innerch, s->ext.ech.innerch_len) == 0) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_swaperoo");
             BIO_free(handbuf);
             return 0;
         }
@@ -873,13 +873,13 @@ int ossl_ech_swaperoo(SSL_CONNECTION *s)
             && mt == SSL3_MT_CLIENT_HELLO
             && PACKET_remaining(&pkt) >= 3) {
             if (!PACKET_get_length_prefixed_3(&pkt, &subpkt)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_swaperoo");
                 BIO_free(handbuf);
                 return 0;
             }
             if (PACKET_remaining(&pkt) > 0) {
                 if (ssl3_finish_mac(s, PACKET_data(&pkt), PACKET_remaining(&pkt)) == 0) {
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_swaperoo");
                     BIO_free(handbuf);
                     return 0;
                 }
@@ -904,7 +904,7 @@ int ossl_ech_swaperoo(SSL_CONNECTION *s)
         unsigned int cbrv = 0;
 
         if (biom == NULL) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_swaperoo");
             return 0;
         }
         ossl_ech_status_print(biom, s, OSSL_ECHSTORE_ALL);
@@ -912,7 +912,7 @@ int ossl_ech_swaperoo(SSL_CONNECTION *s)
         cbrv = s->ext.ech.cb(&s->ssl, pstr);
         BIO_free(biom);
         if (cbrv != 1) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_swaperoo");
             return 0;
         }
     }
@@ -958,7 +958,7 @@ static int ech_hkdf_extract_wrap(SSL_CONNECTION *s, EVP_MD *md, int for_hrr,
                EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY)
             != 1
         || EVP_PKEY_CTX_set_hkdf_md(pctx, md) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_hkdf_extract_wrap");
         goto err;
     }
     /* pick correct client_random */
@@ -974,7 +974,7 @@ static int ech_hkdf_extract_wrap(SSL_CONNECTION *s, EVP_MD *md, int for_hrr,
         || EVP_PKEY_derive(pctx, NULL, &retlen) != 1
         || hashlen != retlen
         || EVP_PKEY_derive(pctx, notsecret, &retlen) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_hkdf_extract_wrap");
         goto err;
     }
 #ifdef OSSL_ECH_SUPERVERBOSE
@@ -985,7 +985,7 @@ static int ech_hkdf_extract_wrap(SSL_CONNECTION *s, EVP_MD *md, int for_hrr,
             (const unsigned char *)label, labellen,
             hashval, hashlen, hoval,
             OSSL_ECH_SIGNAL_LEN, 1)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_hkdf_extract_wrap");
         goto err;
     }
     rv = 1;
@@ -1035,11 +1035,11 @@ int ossl_ech_calc_confirm(SSL_CONNECTION *s, int for_hrr,
     SSL_CTX *sctx = SSL_CONNECTION_GET_CTX(s);
 
     if ((md = (EVP_MD *)ssl_handshake_md(s)) == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_ECH_REQUIRED);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_MISSING_REQUIRED_DATA, "missing required data in ossl ech calc confirm");
         goto end;
     }
     if (ossl_ech_intbuf_fetch(s, &tbuf, &tlen) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_ECH_REQUIRED);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_MISSING_REQUIRED_DATA, "missing required data in ossl ech calc confirm");
         goto end;
     }
     chend = tlen - shlen - 4;
@@ -1059,7 +1059,7 @@ int ossl_ech_calc_confirm(SSL_CONNECTION *s, int for_hrr,
             /* No ECH found so we'll exit, but set random output */
             if (RAND_bytes_ex(sctx->libctx, acbuf, OSSL_ECH_SIGNAL_LEN, 0)
                 <= 0) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_ECH_REQUIRED);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_MISSING_REQUIRED_DATA, "missing required data in ossl ech calc confirm");
                 goto end;
             }
             rv = 1;
@@ -1075,7 +1075,7 @@ int ossl_ech_calc_confirm(SSL_CONNECTION *s, int for_hrr,
         || EVP_DigestInit_ex(ctx, md, NULL) <= 0
         || EVP_DigestUpdate(ctx, tbuf, tlen) <= 0
         || EVP_DigestFinal_ex(ctx, hashval, &hashlen) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_calc_confirm");
         goto end;
     }
     EVP_MD_CTX_free(ctx);
@@ -1085,7 +1085,7 @@ int ossl_ech_calc_confirm(SSL_CONNECTION *s, int for_hrr,
 #endif
     /* calculate and set the final output */
     if (ech_hkdf_extract_wrap(s, md, for_hrr, hashval, hashlen, acbuf) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_calc_confirm");
         goto end;
     }
 #ifdef OSSL_ECH_SUPERVERBOSE
@@ -1137,7 +1137,7 @@ int ossl_ech_get_ch_offsets(SSL_CONNECTION *s, PACKET *pkt, size_t *sessid_off,
     if (pkt == NULL || sessid_off == NULL || exts_off == NULL
         || ech_off == NULL || echtype == NULL || inner == NULL
         || sni_off == NULL) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ossl ech get ch offsets");
         return 0;
     }
     /* check if we've already done the work */
@@ -1158,14 +1158,14 @@ int ossl_ech_get_ch_offsets(SSL_CONNECTION *s, PACKET *pkt, size_t *sessid_off,
     /* do the work */
     ch_len = PACKET_remaining(pkt);
     if (PACKET_peek_bytes(pkt, &ch, ch_len) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ossl ech get ch offsets");
         return 0;
     }
     if (ossl_ech_helper_get_ch_offsets(ch, ch_len, sessid_off, exts_off,
             &exts_len, ech_off, echtype, &ech_len,
             sni_off, &sni_len, inner)
         != 1) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ossl ech get ch offsets");
         return 0;
     }
 #ifdef OSSL_ECH_SUPERVERBOSE
@@ -1220,7 +1220,7 @@ static int ech_get_outer_sni(SSL_CONNECTION *s, char **osni_str,
         || type != 0
         || !PACKET_get_net_2(&wrap, &osnilen)
         || !PACKET_get_sub_packet(&wrap, &osni, osnilen)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech get outer sni");
         return 0;
     }
     if (tls_parse_ctos_server_name(s, &osni, 0, NULL, 0) != 1)
@@ -1273,26 +1273,26 @@ static int ech_decode_inbound_ech(SSL_CONNECTION *s, PACKET *pkt,
     if (extval == NULL)
         goto err;
     if (!PACKET_get_1(pkt, &innerorouter)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     if (innerorouter != OSSL_ECH_OUTER_CH_TYPE) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     if (!PACKET_get_net_2(pkt, &pval_tmp)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     extval->kdf_id = pval_tmp & 0xffff;
     if (!PACKET_get_net_2(pkt, &pval_tmp)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     extval->aead_id = pval_tmp & 0xffff;
     /* config id */
     if (!PACKET_copy_bytes(pkt, &extval->config_id, 1)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
 #ifdef OSSL_ECH_SUPERVERBOSE
@@ -1301,19 +1301,19 @@ static int ech_decode_inbound_ech(SSL_CONNECTION *s, PACKET *pkt,
     s->ext.ech.attempted_cid = extval->config_id;
     /* enc - the client's public share */
     if (!PACKET_get_net_2(pkt, &pval_tmp)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     if (pval_tmp > OSSL_ECH_MAX_GREASE_PUB) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     if (pval_tmp > PACKET_remaining(pkt)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     if (pval_tmp == 0 && s->hello_retry_request != SSL_HRR_PENDING) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     } else if (pval_tmp > 0 && s->hello_retry_request == SSL_HRR_PENDING) {
         unsigned char *tmpenc = NULL;
@@ -1325,15 +1325,15 @@ static int ech_decode_inbound_ech(SSL_CONNECTION *s, PACKET *pkt,
          */
         if (s->ext.ech.success == 1) {
             /* first decrypt worked, so enc should be empty */
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
             goto err;
         }
         if (s->ext.ech.pub == NULL || s->ext.ech.pub_len == 0) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
             goto err;
         }
         if (pval_tmp != s->ext.ech.pub_len) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
             goto err;
         }
         tmpenc = OPENSSL_malloc(pval_tmp);
@@ -1341,18 +1341,18 @@ static int ech_decode_inbound_ech(SSL_CONNECTION *s, PACKET *pkt,
             goto err;
         if (!PACKET_copy_bytes(pkt, tmpenc, pval_tmp)) {
             OPENSSL_free(tmpenc);
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
             goto err;
         }
         if (memcmp(tmpenc, s->ext.ech.pub, pval_tmp) != 0) {
             OPENSSL_free(tmpenc);
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
             goto err;
         }
         OPENSSL_free(tmpenc);
     } else if (pval_tmp == 0 && s->hello_retry_request == SSL_HRR_PENDING) {
         if (s->ext.ech.pub == NULL || s->ext.ech.pub_len == 0) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
             goto err;
         }
         extval->enc_len = s->ext.ech.pub_len;
@@ -1366,7 +1366,7 @@ static int ech_decode_inbound_ech(SSL_CONNECTION *s, PACKET *pkt,
         if (extval->enc == NULL)
             goto err;
         if (!PACKET_copy_bytes(pkt, extval->enc, pval_tmp)) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
             goto err;
         }
         /* squirrel away that value in case of future HRR */
@@ -1380,15 +1380,15 @@ static int ech_decode_inbound_ech(SSL_CONNECTION *s, PACKET *pkt,
     /* payload - the encrypted CH */
     *payload_offset = PACKET_data(pkt) - startofech;
     if (!PACKET_get_net_2(pkt, &pval_tmp)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     if (pval_tmp > OSSL_ECH_MAX_PAYLOAD_LEN) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     if (pval_tmp == 0 || pval_tmp > PACKET_remaining(pkt)) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     extval->payload_len = pval_tmp;
@@ -1396,7 +1396,7 @@ static int ech_decode_inbound_ech(SSL_CONNECTION *s, PACKET *pkt,
     if (extval->payload == NULL)
         goto err;
     if (!PACKET_copy_bytes(pkt, extval->payload, pval_tmp)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inbound ech");
         goto err;
     }
     *retext = extval;
@@ -1444,24 +1444,24 @@ static int ech_find_outers(SSL_CONNECTION *s, PACKET *pkt,
         || pi_tmp != 0x00 /* 1 octet of no comressions */
         || !PACKET_get_net_2(pkt, &extlens) /* len(extensions) */
         || extlens == 0) { /* no extensions! */
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech find outers");
         goto err;
     }
     while (PACKET_remaining(pkt) > 0 && outers_found == 0) {
         if (!PACKET_get_net_2(pkt, &etype)) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech find outers");
             goto err;
         }
         if (etype == TLSEXT_TYPE_outer_extensions) {
             outers_found = 1;
             if (!PACKET_get_length_prefixed_2(pkt, &op)) {
-                SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+                SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech find outers");
                 goto err;
             }
         } else { /* skip over */
             if (!PACKET_get_net_2(pkt, &elen)
                 || !PACKET_get_bytes(pkt, &pp_tmp, elen)) {
-                SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+                SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech find outers");
                 goto err;
             }
         }
@@ -1479,7 +1479,7 @@ static int ech_find_outers(SSL_CONNECTION *s, PACKET *pkt,
     if (!PACKET_get_1(&op, &olen)
         || olen % 2 == 1
         || olen / 2 > OSSL_ECH_OUTERS_MAX) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech find outers");
         goto err;
     }
     *n_outers = olen / 2;
@@ -1488,7 +1488,7 @@ static int ech_find_outers(SSL_CONNECTION *s, PACKET *pkt,
         if (!PACKET_get_net_2(&op, &pi_tmp)
             || pi_tmp == TLSEXT_TYPE_outer_extensions
             || pi_tmp == TLSEXT_TYPE_ech) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech find outers");
             goto err;
         }
         outers[i] = (uint16_t)pi_tmp;
@@ -1516,21 +1516,21 @@ static int ech_copy_ext(SSL_CONNECTION *s, WPACKET *di, uint16_t type2copy,
         if (!PACKET_get_net_2(exts, &etype)
             || !PACKET_get_net_2(exts, &elen)
             || !PACKET_get_bytes(exts, &eval, elen)) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech copy ext");
             goto err;
         }
         if (etype == type2copy) {
             if (!WPACKET_put_bytes_u16(di, etype)
                 || !WPACKET_put_bytes_u16(di, elen)
                 || !WPACKET_memcpy(di, eval, elen)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech copy ext");
                 goto err;
             }
             return 1;
         }
     }
     /* we didn't find such an extension - that's an error */
-    SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+    SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech copy ext");
 err:
     return 0;
 }
@@ -1556,7 +1556,7 @@ static int ech_reconstitute_inner(SSL_CONNECTION *s, WPACKET *di, PACKET *ei,
     int outers_done = 0;
 
     if (PACKET_buf_init(&outer, ob, ob_len) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_reconstitute_inner");
         goto err;
     }
     /* read/write from encoded inner to decoded inner with help from outer */
@@ -1592,7 +1592,7 @@ static int ech_reconstitute_inner(SSL_CONNECTION *s, WPACKET *di, PACKET *ei,
         || !PACKET_get_net_2(ei, &pi_tmp)
         || !PACKET_get_net_2(&outer, &pi_tmp)
         || !WPACKET_put_bytes_u16(di, pi_tmp)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech reconstitute inner");
         goto err;
     }
     /* handle simple, but unlikely, case first */
@@ -1603,7 +1603,7 @@ static int ech_reconstitute_inner(SSL_CONNECTION *s, WPACKET *di, PACKET *ei,
             || !PACKET_get_bytes(ei, &pp_tmp, pi_tmp)
             || !WPACKET_put_bytes_u16(di, pi_tmp)
             || !WPACKET_memcpy(di, pp_tmp, pi_tmp)) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech reconstitute inner");
             goto err;
         }
         WPACKET_close(di);
@@ -1617,25 +1617,25 @@ static int ech_reconstitute_inner(SSL_CONNECTION *s, WPACKET *di, PACKET *ei,
         || !PACKET_get_net_2(&outer, &outer_extslen)
         || !PACKET_get_bytes(&outer, &outer_exts, outer_extslen)
         || !WPACKET_start_sub_packet_u16(di)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech reconstitute inner");
         goto err;
     }
     while (PACKET_remaining(ei) > 0) {
         if (!PACKET_get_net_2(ei, &etype)
             || !PACKET_get_net_2(ei, &elen)
             || !PACKET_get_bytes(ei, &eval, elen)) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech reconstitute inner");
             goto err;
         }
         if (etype == TLSEXT_TYPE_outer_extensions) {
             PACKET exts;
 
             if (outers_done++) { /* just do this once */
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_reconstitute_inner");
                 goto err;
             }
             if (PACKET_buf_init(&exts, outer_exts, outer_extslen) != 1) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_reconstitute_inner");
                 goto err;
             }
             for (i = 0; i != n_outers; i++) {
@@ -1647,7 +1647,7 @@ static int ech_reconstitute_inner(SSL_CONNECTION *s, WPACKET *di, PACKET *ei,
             if (!WPACKET_put_bytes_u16(di, etype)
                 || !WPACKET_put_bytes_u16(di, elen)
                 || !WPACKET_memcpy(di, eval, elen)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech reconstitute inner");
                 goto err;
             }
         }
@@ -1692,7 +1692,7 @@ static int ech_decode_inner(SSL_CONNECTION *s, const unsigned char *ob,
     WPACKET di = { 0 }; /* "fake" pkt for inner */
 
     if (encoded_inner == NULL || ob == NULL || ob_len == 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_decode_inner");
         return 0;
     }
     if ((di_mem = BUF_MEM_new()) == NULL
@@ -1701,7 +1701,7 @@ static int ech_decode_inner(SSL_CONNECTION *s, const unsigned char *ob,
         || !WPACKET_put_bytes_u8(&di, SSL3_MT_CLIENT_HELLO)
         || !WPACKET_start_sub_packet_u24(&di)
         || !PACKET_buf_init(&ei, encoded_inner, encoded_inner_len)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_decode_inner");
         goto err;
     }
 #ifdef OSSL_ECH_SUPERVERBOSE
@@ -1715,7 +1715,7 @@ static int ech_decode_inner(SSL_CONNECTION *s, const unsigned char *ob,
     /* 2. reconstitute inner CH */
     /* reset ei */
     if (PACKET_buf_init(&ei, encoded_inner, encoded_inner_len) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_decode_inner");
         goto err;
     }
     if (ech_reconstitute_inner(s, &di, &ei, ob, ob_len, outers, n_outers) != 1)
@@ -1723,7 +1723,7 @@ static int ech_decode_inner(SSL_CONNECTION *s, const unsigned char *ob,
     /* 3. store final inner CH in connection */
     WPACKET_close(&di);
     if (!WPACKET_get_length(&di, &s->ext.ech.innerch_len)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_decode_inner");
         goto err;
     }
     OPENSSL_free(s->ext.ech.innerch);
@@ -1833,7 +1833,7 @@ static unsigned char *hpke_decrypt_encch(SSL_CONNECTION *s,
         if (rv != 1) {
             /* don't clear this error - GREASE can't cause it */
             ERR_clear_last_mark();
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ech_decode_inner");
             goto end;
         }
     }
@@ -1867,7 +1867,7 @@ end:
         PACKET innerchpkt;
 
         if (PACKET_buf_init(&innerchpkt, clear, clearlen) != 1) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inner");
             goto paderr;
         }
         /* reset the offsets, as we move from outer to inner CH */
@@ -1881,7 +1881,7 @@ end:
         }
         /* odd form of check below just for emphasis */
         if ((extsoffset + 2) > clearlen) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inner");
             goto paderr;
         }
         extslen = (unsigned char)(clear[extsoffset]) * 256
@@ -1889,18 +1889,18 @@ end:
         ch_len = extsoffset + 2 + extslen;
         /* the check below protects us from bogus data */
         if (ch_len > clearlen) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ech decode inner");
             goto paderr;
         }
         /* The RFC calls for that padding to be all zeros */
 
         if (*innerlen < ch_len) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inner");
             goto paderr;
         }
         for (zind = ch_len; zind != *innerlen; zind++) {
             if (clear[zind] != 0x00) {
-                SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+                SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inner");
                 goto paderr;
             }
         }
@@ -1910,7 +1910,7 @@ end:
 #endif
         return clear;
     } else {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ech decode inner");
     }
 paderr:
     OPENSSL_free(clear);
@@ -1960,7 +1960,7 @@ int ossl_ech_early_decrypt(SSL_CONNECTION *s, PACKET *outerpkt, PACKET *newpkt)
     if (s == NULL)
         return 0;
     if (outerpkt == NULL || newpkt == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ossl ech early decrypt");
         return 0;
     }
     /* find offsets - on success, outputs are safe to use */
@@ -1974,7 +1974,7 @@ int ossl_ech_early_decrypt(SSL_CONNECTION *s, PACKET *outerpkt, PACKET *newpkt)
     if (echoffset == 0 || echtype != TLSEXT_TYPE_ech)
         return 1; /* ECH not present or wrong version */
     if (innerflag == 1) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ossl ech early decrypt");
         return 0;
     }
     s->ext.ech.attempted = 1; /* Remember that we got an ECH */
@@ -1986,7 +1986,7 @@ int ossl_ech_early_decrypt(SSL_CONNECTION *s, PACKET *outerpkt, PACKET *newpkt)
     s->tmp_session_id_len = opd[startofsessid]; /* grab the session id */
     if (s->tmp_session_id_len > SSL_MAX_SSL_SESSION_ID_LENGTH
         || startofsessid + 1 + s->tmp_session_id_len > opl) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ossl ech early decrypt");
         goto err;
     }
     memcpy(s->tmp_session_id, &opd[startofsessid + 1], s->tmp_session_id_len);
@@ -1995,7 +1995,7 @@ int ossl_ech_early_decrypt(SSL_CONNECTION *s, PACKET *outerpkt, PACKET *newpkt)
             /* SSLfatal called already */
             goto err;
         if (osni_str == NULL) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ossl ech early decrypt");
             goto err;
         }
         OSSL_TRACE1(TLS, "EARLY: outer SNI of %s\n", osni_str);
@@ -2003,17 +2003,17 @@ int ossl_ech_early_decrypt(SSL_CONNECTION *s, PACKET *outerpkt, PACKET *newpkt)
         OSSL_TRACE(TLS, "EARLY: no sign of an outer SNI\n");
     }
     if (echoffset > opl - 4) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ossl ech early decrypt");
         goto err;
     }
     startofech = &opd[echoffset + 4];
     echlen = opd[echoffset + 2] * 256 + opd[echoffset + 3];
     if (echlen > opl - echoffset - 4) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ossl ech early decrypt");
         goto err;
     }
     if (PACKET_buf_init(&echpkt, startofech, echlen) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ossl ech early decrypt");
         goto err;
     }
     if (ech_decode_inbound_ech(s, &echpkt, &extval, &startofciphertext) != 1)
@@ -2028,12 +2028,12 @@ int ossl_ech_early_decrypt(SSL_CONNECTION *s, PACKET *outerpkt, PACKET *newpkt)
     lenofciphertext = extval->payload_len;
     aad_len = opl;
     if (aad_len < startofciphertext + lenofciphertext) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "invalid format in ossl ech early decrypt");
         goto err;
     }
     aad = OPENSSL_memdup(opd, aad_len);
     if (aad == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_early_decrypt");
         goto err;
     }
     memset(aad + startofciphertext, 0, lenofciphertext);
@@ -2042,7 +2042,7 @@ int ossl_ech_early_decrypt(SSL_CONNECTION *s, PACKET *outerpkt, PACKET *newpkt)
 #endif
     s->ext.ech.grease = OSSL_ECH_GREASE_UNKNOWN;
     if (s->ext.ech.es == NULL) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in ossl ech early decrypt");
         goto err;
     }
     es = s->ext.ech.es;
@@ -2122,7 +2122,7 @@ int ossl_ech_early_decrypt(SSL_CONNECTION *s, PACKET *outerpkt, PACKET *newpkt)
     }
     /* 4. if decrypt worked, de-compress cleartext to make up real inner CH */
     if (ech_decode_inner(s, opd, opl, clear, clearlen) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_early_decrypt");
         goto err;
     }
     OPENSSL_free(clear);
@@ -2134,18 +2134,18 @@ int ossl_ech_early_decrypt(SSL_CONNECTION *s, PACKET *outerpkt, PACKET *newpkt)
     if (PACKET_buf_init(newpkt, s->ext.ech.innerch,
             s->ext.ech.innerch_len)
         != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_early_decrypt");
         goto err;
     }
     /* tls_process_client_hello doesn't want the message header, so skip it */
     if (!PACKET_forward(newpkt, SSL3_HM_HEADER_LENGTH)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_early_decrypt");
         goto err;
     }
     if (ossl_ech_intbuf_add(s, s->ext.ech.innerch,
             s->ext.ech.innerch_len, 0)
         != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in ossl_ech_early_decrypt");
         goto err;
     }
     return 1;

@@ -1283,7 +1283,7 @@ static void port_send_retry(QUIC_PORT *port,
      * on a non-blocking BIO
      */
     if (!BIO_sendmmsg(port->net_wbio, msg, sizeof(BIO_MSG), 1, 0, &written))
-        ERR_raise_data(ERR_LIB_SSL, SSL_R_QUIC_NETWORK_ERROR,
+        ERR_raise_data(ERR_LIB_SSL, ERR_R_IO_ERROR,
             "port retry send failed due to network BIO I/O error");
 
 err:
@@ -1375,7 +1375,7 @@ static void port_send_version_negotiation(QUIC_PORT *port, BIO_ADDR *peer,
      * BIO_sendmmsg call falls in a retryable manner
      */
     if (!BIO_sendmmsg(port->net_wbio, msg, sizeof(BIO_MSG), 1, 0, &written))
-        ERR_raise_data(ERR_LIB_SSL, SSL_R_QUIC_NETWORK_ERROR,
+        ERR_raise_data(ERR_LIB_SSL, ERR_R_IO_ERROR,
             "port version negotiation send failed");
 }
 
@@ -1822,7 +1822,7 @@ void ossl_quic_port_raise_net_error(QUIC_PORT *port,
      * Immediately capture any triggering error on the error stack, with a
      * cover error.
      */
-    ERR_raise_data(ERR_LIB_SSL, SSL_R_QUIC_NETWORK_ERROR,
+    ERR_raise_data(ERR_LIB_SSL, ERR_R_IO_ERROR,
         "port failed due to network BIO I/O error");
     OSSL_ERR_STATE_save(port->err_state);
 

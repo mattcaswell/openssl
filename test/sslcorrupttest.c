@@ -241,7 +241,7 @@ static int test_ssl_corrupt(int testidx)
             TEST_error("Decryption failed or bad record MAC not seen");
             goto end;
         }
-    } while (ERR_GET_REASON(err) != SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC);
+    } while (ERR_GET_REASON(err) != ERR_R_VERIFICATION_FAILED);
 
     testresult = 1;
 end:

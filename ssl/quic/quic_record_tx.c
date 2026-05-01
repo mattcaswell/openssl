@@ -483,7 +483,7 @@ static int qtx_encrypt_into_txe(OSSL_QTX *qtx, struct iovec_cur *cur, TXE *txe,
      * key?
      */
     if (el->op_count >= ossl_qrl_get_suite_max_pkt(el->suite_id)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_MAXIMUM_ENCRYPTED_PKTS_REACHED);
+        ERR_raise(ERR_LIB_SSL, ERR_R_OVERFLOW);
         return 0;
     }
 

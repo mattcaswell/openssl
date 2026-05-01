@@ -138,7 +138,7 @@ static int dtls_process_record(OSSL_RECORD_LAYER *rl, DTLS_BITMAP *bitmap)
 
     /* check is not needed I believe */
     if (rr->length > SSL3_RT_MAX_ENCRYPTED_LENGTH) {
-        RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
+        RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, ERR_R_INVALID_LENGTH);
         return 0;
     }
 
@@ -163,7 +163,7 @@ static int dtls_process_record(OSSL_RECORD_LAYER *rl, DTLS_BITMAP *bitmap)
         unsigned char *mac;
 
         if (rr->orig_len < mac_size) {
-            RLAYERfatal(rl, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_TOO_SHORT);
+            RLAYERfatal(rl, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH);
             return 0;
         }
         rr->length -= mac_size;
@@ -171,7 +171,7 @@ static int dtls_process_record(OSSL_RECORD_LAYER *rl, DTLS_BITMAP *bitmap)
         i = rl->funcs->mac(rl, rr, md, 0 /* not send */);
         if (i == 0 || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
             RLAYERfatal(rl, SSL_AD_BAD_RECORD_MAC,
-                SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC);
+                ERR_R_VERIFICATION_FAILED);
             return 0;
         }
         /*
@@ -239,11 +239,11 @@ static int dtls_process_record(OSSL_RECORD_LAYER *rl, DTLS_BITMAP *bitmap)
     if (rl->compctx != NULL) {
         if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH) {
             RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW,
-                SSL_R_COMPRESSED_LENGTH_TOO_LONG);
+                ERR_R_INVALID_LENGTH);
             goto end;
         }
         if (!tls_do_uncompress(rl, rr)) {
-            RLAYERfatal(rl, SSL_AD_DECOMPRESSION_FAILURE, SSL_R_BAD_DECOMPRESSION);
+            RLAYERfatal(rl, SSL_AD_DECOMPRESSION_FAILURE, ERR_R_INVALID_FORMAT);
             goto end;
         }
     }
@@ -253,7 +253,7 @@ static int dtls_process_record(OSSL_RECORD_LAYER *rl, DTLS_BITMAP *bitmap)
      * Length setting.
      */
     if (rr->length > rl->max_frag_len) {
-        RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, SSL_R_DATA_LENGTH_TOO_LONG);
+        RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, ERR_R_INVALID_LENGTH);
         goto end;
     }
 

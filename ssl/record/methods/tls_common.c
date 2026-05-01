@@ -424,7 +424,7 @@ int tls_default_read_n(OSSL_RECORD_LAYER *rl, size_t n, size_t max, int extend,
                 ret = OSSL_RECORD_RETURN_FATAL;
             }
         } else {
-            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_READ_BIO_NOT_SET);
+            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_NOT_INITIALIZED);
             ret = OSSL_RECORD_RETURN_FATAL;
         }
 
@@ -501,7 +501,7 @@ static int rlayer_early_data_count_ok(OSSL_RECORD_LAYER *rl, size_t length,
 
     if (max_early_data == 0) {
         RLAYERfatal(rl, send ? SSL_AD_INTERNAL_ERROR : SSL_AD_UNEXPECTED_MESSAGE,
-            SSL_R_TOO_MUCH_EARLY_DATA);
+            ERR_R_INVALID_LENGTH);
         return 0;
     }
 
@@ -510,7 +510,7 @@ static int rlayer_early_data_count_ok(OSSL_RECORD_LAYER *rl, size_t length,
 
     if (rl->early_data_count + length > max_early_data) {
         RLAYERfatal(rl, send ? SSL_AD_INTERNAL_ERROR : SSL_AD_UNEXPECTED_MESSAGE,
-            SSL_R_TOO_MUCH_EARLY_DATA);
+            ERR_R_INVALID_LENGTH);
         return 0;
     }
     rl->early_data_count += length;
@@ -615,7 +615,7 @@ int tls_get_more_records(OSSL_RECORD_LAYER *rl)
 
             if (thisrr->length > TLS_BUFFER_get_len(rbuf) - SSL3_RT_HEADER_LENGTH) {
                 RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW,
-                    SSL_R_PACKET_LENGTH_TOO_LONG);
+                    ERR_R_INVALID_LENGTH);
                 return OSSL_RECORD_RETURN_FATAL;
             }
 
@@ -695,7 +695,7 @@ int tls_get_more_records(OSSL_RECORD_LAYER *rl)
          */
         if (thisrr->length != 1 || thisrr->data[0] != 0x01) {
             RLAYERfatal(rl, SSL_AD_UNEXPECTED_MESSAGE,
-                SSL_R_INVALID_CCS_MESSAGE);
+                ERR_R_PROTOCOL_ERROR);
             return OSSL_RECORD_RETURN_FATAL;
         }
         /*
@@ -708,7 +708,7 @@ int tls_get_more_records(OSSL_RECORD_LAYER *rl)
         thisrr->type = SSL3_RT_HANDSHAKE;
         if (++(rl->empty_record_count) > MAX_EMPTY_RECORDS) {
             RLAYERfatal(rl, SSL_AD_UNEXPECTED_MESSAGE,
-                SSL_R_UNEXPECTED_CCS_MESSAGE);
+                ERR_R_WRONG_STATE);
             return OSSL_RECORD_RETURN_FATAL;
         }
         rl->num_recs = 0;
@@ -742,7 +742,7 @@ int tls_get_more_records(OSSL_RECORD_LAYER *rl)
             thisrr = &rr[j];
 
             if (thisrr->length < mac_size) {
-                RLAYERfatal(rl, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_TOO_SHORT);
+                RLAYERfatal(rl, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH);
                 return OSSL_RECORD_RETURN_FATAL;
             }
             thisrr->length -= mac_size;
@@ -750,7 +750,7 @@ int tls_get_more_records(OSSL_RECORD_LAYER *rl)
             i = rl->funcs->mac(rl, thisrr, md, 0 /* not send */);
             if (i == 0 || CRYPTO_memcmp(md, mac, mac_size) != 0) {
                 RLAYERfatal(rl, SSL_AD_BAD_RECORD_MAC,
-                    SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC);
+                    ERR_R_VERIFICATION_FAILED);
                 return OSSL_RECORD_RETURN_FATAL;
             }
         }
@@ -817,7 +817,7 @@ int tls_get_more_records(OSSL_RECORD_LAYER *rl)
         }
         ERR_clear_last_mark();
         RLAYERfatal(rl, SSL_AD_BAD_RECORD_MAC,
-            SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC);
+            ERR_R_VERIFICATION_FAILED);
         goto end;
     } else {
         ERR_clear_last_mark();
@@ -865,7 +865,7 @@ int tls_get_more_records(OSSL_RECORD_LAYER *rl)
          * visible to an attacker (e.g. via a logfile)
          */
         RLAYERfatal(rl, SSL_AD_BAD_RECORD_MAC,
-            SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC);
+            ERR_R_VERIFICATION_FAILED);
         goto end;
     }
 
@@ -889,7 +889,7 @@ int tls_get_more_records(OSSL_RECORD_LAYER *rl)
          */
         if (rl->max_frag_len != SSL3_RT_MAX_PLAIN_LENGTH
             && thisrr->length > rl->max_frag_len) {
-            RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, SSL_R_DATA_LENGTH_TOO_LONG);
+            RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, ERR_R_INVALID_LENGTH);
             goto end;
         }
 
@@ -906,7 +906,7 @@ int tls_get_more_records(OSSL_RECORD_LAYER *rl)
         if (thisrr->length == 0) {
             if (++(rl->empty_record_count) > MAX_EMPTY_RECORDS) {
                 RLAYERfatal(rl, SSL_AD_UNEXPECTED_MESSAGE,
-                    SSL_R_RECORD_TOO_SMALL);
+                    ERR_R_INVALID_LENGTH);
                 goto end;
             }
         } else {
@@ -944,7 +944,7 @@ int tls_default_validate_record_header(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *rec
     size_t len = SSL3_RT_MAX_ENCRYPTED_LENGTH;
 
     if (rec->rec_version != rl->version) {
-        RLAYERfatal(rl, SSL_AD_PROTOCOL_VERSION, SSL_R_WRONG_VERSION_NUMBER);
+        RLAYERfatal(rl, SSL_AD_PROTOCOL_VERSION, ERR_R_MISMATCH);
         return 0;
     }
 
@@ -959,7 +959,7 @@ int tls_default_validate_record_header(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *rec
 
     if (rec->length > len) {
         RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW,
-            SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
+            ERR_R_INVALID_LENGTH);
         return 0;
     }
 
@@ -1016,18 +1016,18 @@ int tls_default_post_process_record(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *rec)
     if (rl->compctx != NULL) {
         if (rec->length > SSL3_RT_MAX_COMPRESSED_LENGTH) {
             RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW,
-                SSL_R_COMPRESSED_LENGTH_TOO_LONG);
+                ERR_R_INVALID_LENGTH);
             return 0;
         }
         if (!tls_do_uncompress(rl, rec)) {
             RLAYERfatal(rl, SSL_AD_DECOMPRESSION_FAILURE,
-                SSL_R_BAD_DECOMPRESSION);
+                ERR_R_INVALID_FORMAT);
             return 0;
         }
     }
 
     if (rec->length > SSL3_RT_MAX_PLAIN_LENGTH) {
-        RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, SSL_R_DATA_LENGTH_TOO_LONG);
+        RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW, ERR_R_INVALID_LENGTH);
         return 0;
     }
 
@@ -1040,7 +1040,7 @@ int tls13_common_post_process_record(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *rec)
     if (rec->type != SSL3_RT_APPLICATION_DATA
         && rec->type != SSL3_RT_ALERT
         && rec->type != SSL3_RT_HANDSHAKE) {
-        RLAYERfatal(rl, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_BAD_RECORD_TYPE);
+        RLAYERfatal(rl, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_PROTOCOL_ERROR);
         return 0;
     }
 
@@ -1057,7 +1057,7 @@ int tls13_common_post_process_record(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *rec)
      */
     if ((rec->type == SSL3_RT_HANDSHAKE || rec->type == SSL3_RT_ALERT)
         && rec->length == 0) {
-        RLAYERfatal(rl, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_BAD_LENGTH);
+        RLAYERfatal(rl, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_INVALID_LENGTH);
         return 0;
     }
 
@@ -1080,7 +1080,7 @@ int tls_read_record(OSSL_RECORD_LAYER *rl, void **rechandle, int *rversion,
         int ret;
 
         if (rl->num_released != rl->num_recs) {
-            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_RECORDS_NOT_RELEASED);
+            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_WRONG_STATE);
             return OSSL_RECORD_RETURN_FATAL;
         }
 
@@ -1116,7 +1116,7 @@ int tls_release_record(OSSL_RECORD_LAYER *rl, void *rechandle, size_t length)
     if (!ossl_assert(rl->num_released < rl->curr_rec)
         || !ossl_assert(rechandle == rec)) {
         /* Should not happen */
-        RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_INVALID_RECORD);
+        RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_BAD_DATA);
         return OSSL_RECORD_RETURN_FATAL;
     }
 
@@ -1151,13 +1151,13 @@ int tls_set_options(OSSL_RECORD_LAYER *rl, const OSSL_PARAM *options)
 
     p = OSSL_PARAM_locate_const(options, OSSL_LIBSSL_RECORD_LAYER_PARAM_OPTIONS);
     if (p != NULL && !OSSL_PARAM_get_uint64(p, &rl->options)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+        ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
         return 0;
     }
 
     p = OSSL_PARAM_locate_const(options, OSSL_LIBSSL_RECORD_LAYER_PARAM_MODE);
     if (p != NULL && !OSSL_PARAM_get_uint32(p, &rl->mode)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+        ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
         return 0;
     }
 
@@ -1165,20 +1165,20 @@ int tls_set_options(OSSL_RECORD_LAYER *rl, const OSSL_PARAM *options)
         p = OSSL_PARAM_locate_const(options,
             OSSL_LIBSSL_RECORD_LAYER_READ_BUFFER_LEN);
         if (p != NULL && !OSSL_PARAM_get_size_t(p, &rl->rbuf.default_len)) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
             return 0;
         }
     } else {
         p = OSSL_PARAM_locate_const(options,
             OSSL_LIBSSL_RECORD_LAYER_PARAM_BLOCK_PADDING);
         if (p != NULL && !OSSL_PARAM_get_size_t(p, &rl->block_padding)) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
             return 0;
         }
         p = OSSL_PARAM_locate_const(options,
             OSSL_LIBSSL_RECORD_LAYER_PARAM_HS_PADDING);
         if (p != NULL && !OSSL_PARAM_get_size_t(p, &rl->hs_padding)) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
             return 0;
         }
     }
@@ -1193,7 +1193,7 @@ int tls_set_options(OSSL_RECORD_LAYER *rl, const OSSL_PARAM *options)
         p = OSSL_PARAM_locate_const(options,
             OSSL_LIBSSL_RECORD_LAYER_PARAM_READ_AHEAD);
         if (p != NULL && !OSSL_PARAM_get_int(p, &rl->read_ahead)) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
             return 0;
         }
     }
@@ -1229,39 +1229,39 @@ int tls_int_new_record_layer(OSSL_LIB_CTX *libctx, const char *propq, int vers,
         for (p = settings; p->key != NULL; p++) {
             if (strcmp(p->key, OSSL_LIBSSL_RECORD_LAYER_PARAM_USE_ETM) == 0) {
                 if (!OSSL_PARAM_get_int(p, &rl->use_etm)) {
-                    ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+                    ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
                     goto err;
                 }
             } else if (strcmp(p->key,
                            OSSL_LIBSSL_RECORD_LAYER_PARAM_MAX_FRAG_LEN)
                 == 0) {
                 if (!OSSL_PARAM_get_uint(p, &rl->max_frag_len)) {
-                    ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+                    ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
                     goto err;
                 }
             } else if (strcmp(p->key,
                            OSSL_LIBSSL_RECORD_LAYER_PARAM_MAX_EARLY_DATA)
                 == 0) {
                 if (!OSSL_PARAM_get_uint32(p, &rl->max_early_data)) {
-                    ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+                    ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
                     goto err;
                 }
             } else if (strcmp(p->key,
                            OSSL_LIBSSL_RECORD_LAYER_PARAM_STREAM_MAC)
                 == 0) {
                 if (!OSSL_PARAM_get_int(p, &rl->stream_mac)) {
-                    ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+                    ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
                     goto err;
                 }
             } else if (strcmp(p->key,
                            OSSL_LIBSSL_RECORD_LAYER_PARAM_TLSTREE)
                 == 0) {
                 if (!OSSL_PARAM_get_int(p, &rl->tlstree)) {
-                    ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+                    ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
                     goto err;
                 }
             } else {
-                ERR_raise(ERR_LIB_SSL, SSL_R_UNKNOWN_MANDATORY_PARAMETER);
+                ERR_raise(ERR_LIB_SSL, ERR_R_UNKNOWN);
                 goto err;
             }
         }
@@ -1317,7 +1317,7 @@ int tls_int_new_record_layer(OSSL_LIB_CTX *libctx, const char *propq, int vers,
     }
 
     if (!tls_set_options(rl, options)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_FAILED_TO_GET_PARAMETER);
+        ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
         goto err;
     }
 
@@ -1776,7 +1776,7 @@ int tls_write_records_default(OSSL_RECORD_LAYER *rl,
         if (rl->compctx != NULL) {
             if (!tls_do_compress(rl, thiswr)
                 || !WPACKET_allocate_bytes(thispkt, thiswr->length, NULL)) {
-                RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_COMPRESSION_FAILURE);
+                RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_OPERATION_FAIL);
                 goto err;
             }
         } else if (compressdata != NULL) {
@@ -1895,7 +1895,7 @@ int tls_retry_write_records(OSSL_RECORD_LAYER *rl)
                 }
             }
         } else {
-            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_BIO_NOT_SET);
+            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_NOT_INITIALIZED);
             ret = OSSL_RECORD_RETURN_FATAL;
             i = -1;
         }
@@ -2038,7 +2038,7 @@ int tls_increment_sequence_ctr(OSSL_RECORD_LAYER *rl)
     }
     if (i == 0) {
         /* Sequence has wrapped */
-        RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_SEQUENCE_CTR_WRAPPED);
+        RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_OVERFLOW);
         return 0;
     }
     return 1;

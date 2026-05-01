@@ -683,7 +683,7 @@ static int run_quic_server(SSL_CTX *ctx, BIO *sock)
                  */
                 ERR_print_errors_fp(stderr);
                 errcode = ERR_get_error();
-                if (ERR_GET_REASON(errcode) != SSL_R_PROTOCOL_IS_SHUTDOWN)
+                if (ERR_GET_REASON(errcode) != ERR_R_WRONG_STATE)
                     fprintf(stderr, "Failure in accept stream, error %s\n",
                         ERR_reason_error_string(errcode));
                 break;

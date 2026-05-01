@@ -56,7 +56,7 @@ int tls13_hkdf_expand_ex(OSSL_LIB_CTX *libctx, const char *propq,
              * Probably we have been called from SSL_export_keying_material(),
              * or SSL_export_keying_material_early().
              */
-            ERR_raise(ERR_LIB_SSL, SSL_R_TLS_ILLEGAL_EXPORTER_LABEL);
+            ERR_raise(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT);
 
         EVP_KDF_CTX_free(kctx);
         return 0;
@@ -114,7 +114,7 @@ int tls13_hkdf_expand(SSL_CONNECTION *s, const EVP_MD *md,
         secret, label, labellen, data, datalen,
         out, outlen, !fatal);
     if (ret == 0 && fatal)
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls13_hkdf_expand");
 
     return ret;
 }
@@ -187,14 +187,14 @@ int tls13_generate_secret(SSL_CONNECTION *s, const EVP_MD *md,
     kctx = EVP_KDF_CTX_new(kdf);
     EVP_KDF_free(kdf);
     if (kctx == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to create TLS13 KDF context for secret generation");
         return 0;
     }
 
     mdleni = EVP_MD_get_size(md);
     /* Ensure cast to size_t is safe */
     if (!ossl_assert(mdleni > 0)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "invalid digest size for TLS13 secret generation");
         EVP_KDF_CTX_free(kctx);
         return 0;
     }
@@ -221,7 +221,7 @@ int tls13_generate_secret(SSL_CONNECTION *s, const EVP_MD *md,
     ret = EVP_KDF_derive(kctx, outsecret, mdlen, params) <= 0;
 
     if (ret != 0)
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "TLS13 KDF derive failed for secret generation");
 
     EVP_KDF_CTX_free(kctx);
     return ret == 0;
@@ -256,7 +256,7 @@ int tls13_generate_master_secret(SSL_CONNECTION *s, unsigned char *out,
 
     md_size = EVP_MD_get_size(md);
     if (md_size <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "invalid digest size for TLS13 handshake secret");
         return 0;
     }
     *secret_size = (size_t)md_size;
@@ -311,7 +311,7 @@ size_t tls13_final_finish_mac(SSL_CONNECTION *s, const char *str, size_t slen,
             params, key, hashlen, hash, hashlen,
             /* outsize as per sizeof(peer_finish_md) */
             out, EVP_MAX_MD_SIZE * 2, &len)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "HMAC failed for TLS13 finished MAC generation");
         goto err;
     }
 
@@ -367,7 +367,7 @@ static int derive_secret_key_and_iv(SSL_CONNECTION *s, const EVP_MD *md,
 
     /* Ensure cast to size_t is safe */
     if (!ossl_assert(hashleni > 0)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "invalid hash size in TLS13 key schedule");
         return 0;
     }
     hashlen = (size_t)hashleni;
@@ -385,7 +385,7 @@ static int derive_secret_key_and_iv(SSL_CONNECTION *s, const EVP_MD *md,
         mac_mdleni = EVP_MD_get_size(mac_md);
 
         if (mac_mdleni <= 0) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "invalid MAC digest size in TLS13 key expansion");
             return 0;
         }
         *ivlen = *taglen = (size_t)mac_mdleni;
@@ -408,7 +408,7 @@ static int derive_secret_key_and_iv(SSL_CONNECTION *s, const EVP_MD *md,
                 /* We must be doing early data with out-of-band PSK */
                 algenc = s->psksession->cipher->algorithm_enc;
             } else {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "could not determine cipher algorithm for CCM early data");
                 return 0;
             }
             if (algenc & (SSL_AES128CCM8 | SSL_AES256CCM8))
@@ -426,7 +426,7 @@ static int derive_secret_key_and_iv(SSL_CONNECTION *s, const EVP_MD *md,
             }
             iivlen = EVP_CIPHER_get_iv_length(ciph);
             if (iivlen < 0) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "invalid IV length from cipher in TLS13 key expansion");
                 return 0;
             }
             *ivlen = iivlen;
@@ -436,7 +436,7 @@ static int derive_secret_key_and_iv(SSL_CONNECTION *s, const EVP_MD *md,
     if (*ivlen > EVP_MAX_IV_LENGTH) {
         *iv = OPENSSL_malloc(*ivlen);
         if (*iv == NULL) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_MALLOC_FAILURE);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_MALLOC_FAILURE, "failed to allocate IV for TLS13 key expansion");
             return 0;
         }
     }
@@ -534,7 +534,7 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
             if (((which & SSL3_CC_SERVER) && s->ext.ech.success == 1)
                 || ((which & SSL3_CC_CLIENT) && s->ext.ech.attempted == 1)) {
                 if (s->ext.ech.innerch == NULL) {
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to encode TLS13 finished transport data");
                     goto err;
                 }
                 handlen = (long)s->ext.ech.innerch_len;
@@ -544,8 +544,7 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
             {
                 handlen = BIO_get_mem_data(s->s3.handshake_buffer, &hdata);
                 if (handlen <= 0) {
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR,
-                        SSL_R_BAD_HANDSHAKE_LENGTH);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_LENGTH, "invalid length in tls13 change cipher state");
                     goto err;
                 }
             }
@@ -560,13 +559,13 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
                  */
                 if (!ossl_assert(s->psksession != NULL
                         && s->max_early_data == s->psksession->ext.max_early_data)) {
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to set handshake header for TLS13 finished");
                     goto err;
                 }
                 sslcipher = SSL_SESSION_get0_cipher(s->psksession);
             }
             if (sslcipher == NULL) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_PSK);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_KEY, "TLS13 finished key unusable after reinstallation");
                 goto err;
             }
 
@@ -594,7 +593,7 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
              */
             mdctx = EVP_MD_CTX_new();
             if (mdctx == NULL) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "failed to import TLS13 finished key into EVP");
                 goto err;
             }
 
@@ -602,7 +601,7 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
             if (md == NULL || !EVP_DigestInit_ex(mdctx, md, NULL)
                 || !EVP_DigestUpdate(mdctx, hdata, handlen)
                 || !EVP_DigestFinal_ex(mdctx, hashval, &hashlenui)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to sign TLS13 finished message");
                 EVP_MD_CTX_free(mdctx);
                 goto err;
             }
@@ -615,13 +614,13 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
                     hashval, hashlen,
                     s->early_exporter_master_secret, hashlen,
                     1)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "no TLS13 finished key set for verification");
                 goto err;
             }
 
             if (!ssl_log_secret(s, EARLY_EXPORTER_SECRET_LABEL,
                     s->early_exporter_master_secret, hashlen)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to verify TLS13 finished message");
                 goto err;
             }
         } else if (which & SSL3_CC_HANDSHAKE) {
@@ -629,7 +628,7 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
             finsecret = s->client_finished_secret;
             finsecretlen = EVP_MD_get_size(ssl_handshake_md(s));
             if (finsecretlen <= 0) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls13_change_cipher_state");
                 goto err;
             }
             label = client_handshake_traffic;
@@ -665,7 +664,7 @@ int tls13_change_cipher_state(SSL_CONNECTION *s, int which)
             finsecret = s->server_finished_secret;
             finsecretlen = EVP_MD_get_size(ssl_handshake_md(s));
             if (finsecretlen <= 0) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls13_change_cipher_state");
                 goto err;
             }
             label = server_handshake_traffic;
@@ -805,7 +804,7 @@ int tls13_update_key(SSL_CONNECTION *s, int sending)
     unsigned char *iv = iv_intern;
 
     if ((l = EVP_MD_get_size(md)) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls13_update_key");
         return 0;
     }
     hashlen = (size_t)l;

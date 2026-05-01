@@ -61,14 +61,14 @@ static int poll_translate_ssl_quic(SSL *ssl,
 
     if (SSL_net_read_desired(ssl)) {
         if (!SSL_get_rpoll_descriptor(ssl, &rd)) {
-            ERR_raise_data(ERR_LIB_SSL, SSL_R_POLL_REQUEST_NOT_SUPPORTED,
+            ERR_raise_data(ERR_LIB_SSL, ERR_R_UNSUPPORTED,
                 "SSL_poll requires the network BIOs underlying "
                 "a QUIC SSL object provide poll descriptors");
             return 0;
         }
 
         if (rd.type != BIO_POLL_DESCRIPTOR_TYPE_SOCK_FD) {
-            ERR_raise_data(ERR_LIB_SSL, SSL_R_POLL_REQUEST_NOT_SUPPORTED,
+            ERR_raise_data(ERR_LIB_SSL, ERR_R_UNSUPPORTED,
                 "SSL_poll requires the poll descriptors of the "
                 "network BIOs underlying a QUIC SSL object be "
                 "of socket type");
@@ -81,14 +81,14 @@ static int poll_translate_ssl_quic(SSL *ssl,
 
     if (SSL_net_write_desired(ssl)) {
         if (!SSL_get_wpoll_descriptor(ssl, &wd)) {
-            ERR_raise_data(ERR_LIB_SSL, SSL_R_POLL_REQUEST_NOT_SUPPORTED,
+            ERR_raise_data(ERR_LIB_SSL, ERR_R_UNSUPPORTED,
                 "SSL_poll requires the network BIOs underlying "
                 "a QUIC SSL object provide poll descriptors");
             return 0;
         }
 
         if (wd.type != BIO_POLL_DESCRIPTOR_TYPE_SOCK_FD) {
-            ERR_raise_data(ERR_LIB_SSL, SSL_R_POLL_REQUEST_NOT_SUPPORTED,
+            ERR_raise_data(ERR_LIB_SSL, ERR_R_UNSUPPORTED,
                 "SSL_poll requires the poll descriptors of the "
                 "network BIOs underlying a QUIC SSL object be "
                 "of socket type");
@@ -248,7 +248,7 @@ static int poll_translate(SSL_POLL_ITEM *items,
 #endif
 
             default:
-                ERR_raise_data(ERR_LIB_SSL, SSL_R_POLL_REQUEST_NOT_SUPPORTED,
+                ERR_raise_data(ERR_LIB_SSL, ERR_R_UNSUPPORTED,
                     "SSL_poll currently only supports QUIC SSL "
                     "objects");
                 FAIL_ITEM(i);
@@ -256,13 +256,13 @@ static int poll_translate(SSL_POLL_ITEM *items,
             break;
 
         case BIO_POLL_DESCRIPTOR_TYPE_SOCK_FD:
-            ERR_raise_data(ERR_LIB_SSL, SSL_R_POLL_REQUEST_NOT_SUPPORTED,
+            ERR_raise_data(ERR_LIB_SSL, ERR_R_UNSUPPORTED,
                 "SSL_poll currently does not support polling "
                 "sockets");
             FAIL_ITEM(i);
 
         default:
-            ERR_raise_data(ERR_LIB_SSL, SSL_R_POLL_REQUEST_NOT_SUPPORTED,
+            ERR_raise_data(ERR_LIB_SSL, ERR_R_UNSUPPORTED,
                 "SSL_poll does not support unknown poll descriptor "
                 "type %d",
                 item->desc.type);
@@ -382,19 +382,19 @@ static int poll_readout(SSL_POLL_ITEM *items,
 #endif
 
             default:
-                ERR_raise_data(ERR_LIB_SSL, SSL_R_POLL_REQUEST_NOT_SUPPORTED,
+                ERR_raise_data(ERR_LIB_SSL, ERR_R_UNSUPPORTED,
                     "SSL_poll currently only supports QUIC SSL "
                     "objects");
                 FAIL_ITEM(i);
             }
             break;
         case BIO_POLL_DESCRIPTOR_TYPE_SOCK_FD:
-            ERR_raise_data(ERR_LIB_SSL, SSL_R_POLL_REQUEST_NOT_SUPPORTED,
+            ERR_raise_data(ERR_LIB_SSL, ERR_R_UNSUPPORTED,
                 "SSL_poll currently does not support polling "
                 "sockets");
             FAIL_ITEM(i);
         default:
-            ERR_raise_data(ERR_LIB_SSL, SSL_R_POLL_REQUEST_NOT_SUPPORTED,
+            ERR_raise_data(ERR_LIB_SSL, ERR_R_UNSUPPORTED,
                 "SSL_poll does not support unknown poll descriptor "
                 "type %d",
                 item->desc.type);

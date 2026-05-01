@@ -450,7 +450,7 @@ static int test_just_finished(void)
     if (!TEST_int_eq(SSL_get_error(serverssl, ret), SSL_ERROR_SSL))
         goto end;
 
-    if (!TEST_int_eq(ERR_GET_REASON(ERR_get_error()), SSL_R_UNEXPECTED_MESSAGE))
+    if (!TEST_int_eq(ERR_GET_REASON(ERR_get_error()), ERR_R_WRONG_STATE))
         goto end;
 
     testresult = 1;

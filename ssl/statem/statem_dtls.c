@@ -515,7 +515,7 @@ static int dtls1_preprocess_fragment(SSL_CONNECTION *s,
     /* sanity checking */
     if ((frag_off + frag_len) > msg_len
         || msg_len > dtls1_max_handshake_message_len(s)) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_EXCESSIVE_MESSAGE_SIZE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_LENGTH, "DTLS fragment offset+length exceeds message length");
         return 0;
     }
 
@@ -525,7 +525,7 @@ static int dtls1_preprocess_fragment(SSL_CONNECTION *s,
          * dtls_max_handshake_message_len(s) above
          */
         if (!BUF_MEM_grow_clean(s->init_buf, msg_len + DTLS1_HM_HEADER_LENGTH)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_BUF_LIB);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_BUF_LIB, "failed to grow buffer for DTLS fragment reassembly");
             return 0;
         }
 
@@ -539,7 +539,7 @@ static int dtls1_preprocess_fragment(SSL_CONNECTION *s,
          * They must be playing with us! BTW, failure to enforce upper limit
          * would open possibility for buffer overrun.
          */
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_EXCESSIVE_MESSAGE_SIZE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_LENGTH, "DTLS fragment message length changed between fragments");
         return 0;
     }
 
@@ -927,8 +927,7 @@ redo:
     }
     if (recvd_type == SSL3_RT_CHANGE_CIPHER_SPEC) {
         if (p[0] != SSL3_MT_CCS) {
-            SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE,
-                SSL_R_BAD_CHANGE_CIPHER_SPEC);
+            SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_PROTOCOL_ERROR, "protocol error in dget reassembled message");
             goto f_err;
         }
 
@@ -938,21 +937,19 @@ redo:
             size_t expected = (s->version == DTLS1_BAD_VER) ? 3 : 1;
 
             if (readbytes != expected) {
-                SSLfatal(s, SSL_AD_DECODE_ERROR,
-                    SSL_R_BAD_CHANGE_CIPHER_SPEC);
+                SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_PROTOCOL_ERROR, "protocol error in dget reassembled message");
                 goto f_err;
             }
             s->d1->has_change_cipher_spec = 1;
             goto redo;
         }
-        SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE,
-            SSL_R_BAD_CHANGE_CIPHER_SPEC);
+        SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_PROTOCOL_ERROR, "protocol error in dget reassembled message");
         goto f_err;
     }
 
     /* Handshake fails if message header is incomplete */
     if (readbytes != DTLS1_HM_HEADER_LENGTH) {
-        SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_UNEXPECTED_MESSAGE);
+        SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "DTLS handshake message header incomplete");
         goto f_err;
     }
 
@@ -968,7 +965,7 @@ redo:
      * Fragments must not span records.
      */
     if (frag_len > s->rlayer.tlsrecs[s->rlayer.curr_rec].length) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_LENGTH);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_LENGTH, "DTLS fragment length exceeds remaining record data");
         goto f_err;
     }
 
@@ -1019,7 +1016,7 @@ redo:
             goto redo;
         } else { /* Incorrectly formatted Hello request */
 
-            SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_UNEXPECTED_MESSAGE);
+            SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "incorrectly formatted DTLS HelloRequest");
             goto f_err;
         }
     }
@@ -1054,7 +1051,7 @@ redo:
      * to fail
      */
     if (readbytes != frag_len) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_LENGTH);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_LENGTH, "DTLS fragment read length does not match expected fragment length");
         goto f_err;
     }
 
@@ -1097,7 +1094,7 @@ CON_FUNC_RETURN dtls_construct_change_cipher_spec(SSL_CONNECTION *s,
         s->d1->next_handshake_write_seq++;
 
         if (!WPACKET_put_bytes_u16(pkt, s->d1->handshake_write_seq)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to write DTLS handshake sequence number");
             return CON_FUNC_ERROR;
         }
     }
@@ -1119,7 +1116,7 @@ WORK_STATE dtls_wait_for_dry(SSL_CONNECTION *s)
     /* read app data until dry event */
     ret = BIO_dgram_sctp_wait_for_dry(SSL_get_wbio(ssl));
     if (ret < 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "SCTP dry event wait failed");
         return WORK_ERROR;
     }
 
@@ -1132,7 +1129,7 @@ WORK_STATE dtls_wait_for_dry(SSL_CONNECTION *s)
          */
         if (dtls_get_reassembled_message(s, &errtype, &len)) {
             /* The call succeeded! This should never happen */
-            SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_UNEXPECTED_MESSAGE);
+            SSLfatal_data(s, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "unexpected DTLS message during SCTP dry wait");
             return WORK_ERROR;
         }
 
@@ -1151,7 +1148,7 @@ int dtls1_read_failed(SSL_CONNECTION *s, int code)
     SSL *ssl = SSL_CONNECTION_GET_SSL(s);
 
     if (code > 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "dtls1_read_failed called with positive code");
         return 0;
     }
 
@@ -1287,7 +1284,7 @@ int dtls1_retransmit_message(SSL_CONNECTION *s, unsigned short seq, int *found)
 
     item = pqueue_find(s->d1->sent_messages, seq64be);
     if (item == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "DTLS sent message not found in retransmit queue");
         *found = 0;
         return 0;
     }

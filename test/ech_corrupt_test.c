@@ -509,19 +509,19 @@ static TEST_ECHINNER test_inners[] = {
         outer_short_encoded_inner, sizeof(outer_short_encoded_inner),
         NULL, 0,
         0, /* expected result */
-        SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC },
+        ERR_R_VERIFICATION_FAILED },
     /* 3. otherwise-correct case that fails only due to client random */
     { NULL, 0,
         entire_encoded_inner, sizeof(entire_encoded_inner),
         NULL, 0,
         0, /* expected result */
-        SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC },
+        ERR_R_VERIFICATION_FAILED },
     /* 4. otherwise-correct case that fails only due to client random */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         encoded_inner_outers, sizeof(encoded_inner_outers),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC },
+        ERR_R_VERIFICATION_FAILED },
     /* 5. fails HPKE decryption due to bad padding so treated as GREASE */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         encoded_inner_outers, sizeof(encoded_inner_outers),
@@ -537,9 +537,9 @@ static TEST_ECHINNER test_inners[] = {
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result - error is different with -notls1_2 */
 #ifdef OPENSSL_NO_TLS1_2
-        SSL_R_VERSION_TOO_LOW
+        ERR_R_UNSUPPORTED
 #else
-        SSL_R_UNSUPPORTED_PROTOCOL
+        ERR_R_UNSUPPORTED
 #endif
     },
 
@@ -554,72 +554,72 @@ static TEST_ECHINNER test_inners[] = {
         short_encoded_inner, sizeof(short_encoded_inner),
         NULL, 0,
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
 
     /* 9. repeated codepoint inside outers */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         borked_outer1, sizeof(borked_outer1),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /* 10. non-existent codepoint inside outers */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         borked_outer2, sizeof(borked_outer2),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /* 11. include SNI in outers as well as both inner and outer */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         borked_outer3, sizeof(borked_outer3),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /* 12. refer to ECH within outers */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         borked_outer4, sizeof(borked_outer4),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /* 13. refer to outers within outers */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         borked_outer5, sizeof(borked_outer5),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /* 14. bad length of outers */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         borked_outer7, sizeof(borked_outer7),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /* 15. bad inner length in outers */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         borked_outer8, sizeof(borked_outer8),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /* 16. HUGE length in outers */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         borked_outer9, sizeof(borked_outer9),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /* 17. zero length in outers */
     { encoded_inner_pre, sizeof(encoded_inner_pre),
         borked_outer10, sizeof(borked_outer10),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /* 18. case with no extensions at all */
     { NULL, 0,
         no_ext_encoded_inner, sizeof(no_ext_encoded_inner),
         NULL, 0,
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /*
      * 19. include key-share twice in outers as well as both inner and outer.
      * There was a change with this one recently that can/does cause a
-     * different error message (used to be SSL_R_BAD_EXTENSION, but now
+     * different error message (used to be ERR_R_INVALID_FORMAT, but now
      * mostly ERR_R_INTERNAL_ERROR). The issue is that this test repeats the
      * key_share in the compressed exts and with PQ kybrid KEMs those are
      * so large that instead of detecting the duplicate extension we see
@@ -630,7 +630,7 @@ static TEST_ECHINNER test_inners[] = {
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
 #ifdef OPENSSL_NO_ML_KEM
-        SSL_R_BAD_EXTENSION
+        ERR_R_INVALID_FORMAT
 #else
         ERR_R_INTERNAL_ERROR
 #endif
@@ -640,13 +640,13 @@ static TEST_ECHINNER test_inners[] = {
         borked_outer12, sizeof(borked_outer12),
         encoded_inner_post, sizeof(encoded_inner_post),
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /* 21. too many outers */
     { NULL, 0,
         too_many_outers, sizeof(too_many_outers),
         NULL, 0,
         0, /* expected result */
-        SSL_R_BAD_EXTENSION },
+        ERR_R_INVALID_FORMAT },
     /*
      * 22. no supported_versions hence TLSv1.2, with server set to
      * allow max tlsv1.3
@@ -654,7 +654,7 @@ static TEST_ECHINNER test_inners[] = {
     { NULL, 0,
         tlsv12_like_inner, sizeof(tlsv12_like_inner),
         NULL, 0,
-        0, /* expected result */ SSL_R_UNSUPPORTED_PROTOCOL },
+        0, /* expected result */ ERR_R_UNSUPPORTED },
     /*
      * 23. no supported_versions hence TLSv1.2, with server set to
      * allow max tlsv1.2
@@ -663,7 +663,7 @@ static TEST_ECHINNER test_inners[] = {
         no_supported_exts, sizeof(no_supported_exts),
         NULL, 0,
         0, /* expected result */
-        SSL_R_NO_PROTOCOLS_AVAILABLE },
+        ERR_R_NO_MATCH },
     /*
      * 24. no supported_versions hence TLSv1.2, with server set to
      * allow min tlsv1.2
@@ -671,17 +671,17 @@ static TEST_ECHINNER test_inners[] = {
     { NULL, 0,
         tlsv12_like_inner, sizeof(tlsv12_like_inner),
         NULL, 0,
-        0, /* expected result */ SSL_R_UNSUPPORTED_PROTOCOL },
+        0, /* expected result */ ERR_R_UNSUPPORTED },
     /* 25. smuggled TLSv1.2 CH */
     { NULL, 0,
         tlsv12_inner, sizeof(tlsv12_inner),
         NULL, 0,
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 26. otherwise-correct case that fails due to lack of inner ECH */
     { NULL, 0,
         encoded_inner_no_ech, sizeof(encoded_inner_no_ech),
         NULL, 0,
-        0, /* expected result */ SSL_R_ECH_REQUIRED },
+        0, /* expected result */ ERR_R_MISSING_REQUIRED_DATA },
 };
 
 /*
@@ -734,16 +734,16 @@ static TEST_SH test_shs[] = {
 
     /* 4. flip bits in SH.random ECH confirmation value */
     { OSSL_ECH_BORK_FLIP, NULL, 0, 0,
-        SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC },
+        ERR_R_VERIFICATION_FAILED },
     /* 5. flip bits in HRR.exts ECH confirmation value */
     { OSSL_ECH_BORK_HRR | OSSL_ECH_BORK_FLIP,
-        NULL, 0, 0, SSL_R_ECH_REQUIRED },
+        NULL, 0, 0, ERR_R_MISSING_REQUIRED_DATA },
     /* 6. truncate HRR.exts ECH confirmation value */
     { OSSL_ECH_BORK_HRR | OSSL_ECH_BORK_REPLACE,
-        shortech, sizeof(shortech), 0, SSL_R_LENGTH_MISMATCH },
+        shortech, sizeof(shortech), 0, ERR_R_INVALID_LENGTH },
     /* 7. too-long HRR.exts ECH confirmation value */
     { OSSL_ECH_BORK_HRR | OSSL_ECH_BORK_REPLACE,
-        longech, sizeof(longech), 0, SSL_R_BAD_EXTENSION },
+        longech, sizeof(longech), 0, ERR_R_INVALID_FORMAT },
 
 };
 
@@ -948,49 +948,49 @@ static TEST_ECHOUTER test_echs[] = {
     /* 2. good encoding/length but breaks TLS session integrity */
     { entire_encoded_ech, sizeof(entire_encoded_ech),
         0, /* expected result */
-        SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC },
+        ERR_R_VERIFICATION_FAILED },
     /* 3. ECH length too long */
     { too_long_ech, sizeof(too_long_ech),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 4. ECH length too short */
     { too_short_ech, sizeof(too_short_ech),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 5. no inner/outer value */
     { no_innerouter_ech, sizeof(no_innerouter_ech),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 6. inner/outer bad value */
     { bad_innerouter_ech, sizeof(bad_innerouter_ech),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 7. too_short_kdf value */
     { too_short_kdf, sizeof(too_short_kdf),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 8. too_short_aead value */
     { too_short_aead, sizeof(too_short_aead),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 9. too_short_cid value */
     { too_short_cid, sizeof(too_short_cid),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 10. zero_encap_len value */
     { zero_encap_len, sizeof(zero_encap_len),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 11. too_short_encap_len value */
     { too_short_encap_len, sizeof(too_short_encap_len),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 12. too_long_encap_len value */
     { too_long_encap_len, sizeof(too_long_encap_len),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 13. bit_long_encap_len value */
     { bit_long_encap_len, sizeof(bit_long_encap_len),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 14.  too_short_payload_len value */
     { too_short_payload_len, sizeof(too_short_payload_len),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 15. bit_long_payload_len value */
     { bit_long_payload_len, sizeof(bit_long_payload_len),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
     /* 16. zero_payload_len value */
     { zero_payload_len, sizeof(zero_payload_len),
-        0, /* expected result */ SSL_R_BAD_EXTENSION },
+        0, /* expected result */ ERR_R_INVALID_FORMAT },
 };
 
 /*
@@ -1742,7 +1742,7 @@ static int ech_retry_config_test(int idx)
         SSL_set_msg_callback(clientssl, corrupt_server_finished);
     /* real but wrong => failure, due to ECH */
     if (!TEST_false(create_ssl_connection(serverssl, clientssl,
-            SSL_R_ECH_REQUIRED)))
+            ERR_R_MISSING_REQUIRED_DATA)))
         goto end;
     serverstatus = SSL_ech_get1_status(serverssl, &sinner, &souter);
     if (verbose)

@@ -23,7 +23,7 @@ int ssl3_do_change_cipher_spec(SSL_CONNECTION *s)
     if (s->s3.tmp.key_block == NULL) {
         if (s->session == NULL || s->session->master_key_length == 0) {
             /* might happen if dtls1_read_bytes() calls this */
-            ERR_raise(ERR_LIB_SSL, SSL_R_CCS_RECEIVED_EARLY);
+            ERR_raise(ERR_LIB_SSL, ERR_R_WRONG_STATE);
             return 0;
         }
 

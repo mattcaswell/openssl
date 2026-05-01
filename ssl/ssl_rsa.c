@@ -92,7 +92,7 @@ int SSL_use_certificate_file(SSL *ssl, const char *file, int type)
         cert = PEM_read_bio_X509(in, &x, sc->default_passwd_callback,
             sc->default_passwd_callback_userdata);
     } else {
-        ERR_raise(ERR_LIB_SSL, SSL_R_BAD_SSL_FILETYPE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
         goto end;
     }
 
@@ -135,7 +135,7 @@ static int ssl_set_pkey(CERT *c, EVP_PKEY *pkey, SSL_CTX *ctx)
     size_t i;
 
     if (ssl_cert_lookup_by_pkey(pkey, &i, ctx) == NULL) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_UNKNOWN_CERTIFICATE_TYPE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_UNKNOWN);
         return 0;
     }
 
@@ -205,7 +205,7 @@ int SSL_use_PrivateKey_file(SSL *ssl, const char *file, int type)
         pkey = d2i_PrivateKey_ex_bio(in, NULL, ssl->ctx->libctx,
             ssl->ctx->propq);
     } else {
-        ERR_raise(ERR_LIB_SSL, SSL_R_BAD_SSL_FILETYPE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
         goto end;
     }
     if (pkey == NULL) {
@@ -262,17 +262,17 @@ static int ssl_set_cert(CERT *c, X509 *x, SSL_CTX *ctx)
 
     pkey = X509_get0_pubkey(x);
     if (pkey == NULL) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_X509_LIB);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR);
         return 0;
     }
 
     if (ssl_cert_lookup_by_pkey(pkey, &i, ctx) == NULL) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_UNKNOWN_CERTIFICATE_TYPE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_UNKNOWN);
         return 0;
     }
 
     if (i == SSL_PKEY_ECC && !EVP_PKEY_can_sign(pkey)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_ECC_CERT_NOT_FOR_SIGNING);
+        ERR_raise(ERR_LIB_SSL, ERR_R_MISMATCH);
         return 0;
     }
 
@@ -310,7 +310,7 @@ static int ssl_set_cert(CERT *c, X509 *x, SSL_CTX *ctx)
 
 int SSL_CTX_use_certificate_file(SSL_CTX *ctx, const char *file, int type)
 {
-    int j = SSL_R_BAD_VALUE;
+    int j = ERR_R_PASSED_INVALID_ARGUMENT;
     BIO *in = NULL;
     int ret = 0;
     X509 *x = NULL, *cert = NULL;
@@ -344,7 +344,7 @@ int SSL_CTX_use_certificate_file(SSL_CTX *ctx, const char *file, int type)
         cert = PEM_read_bio_X509(in, &x, ctx->default_passwd_callback,
             ctx->default_passwd_callback_userdata);
     } else {
-        ERR_raise(ERR_LIB_SSL, SSL_R_BAD_SSL_FILETYPE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
         goto end;
     }
     if (cert == NULL) {
@@ -421,7 +421,7 @@ int SSL_CTX_use_PrivateKey_file(SSL_CTX *ctx, const char *file, int type)
         j = ERR_R_ASN1_LIB;
         pkey = d2i_PrivateKey_ex_bio(in, NULL, ctx->libctx, ctx->propq);
     } else {
-        ERR_raise(ERR_LIB_SSL, SSL_R_BAD_SSL_FILETYPE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
         goto end;
     }
     if (pkey == NULL) {
@@ -829,7 +829,7 @@ int SSL_CTX_use_serverinfo_ex(SSL_CTX *ctx, unsigned int version,
     }
     if (!serverinfo_process_buffer(version, serverinfo, serverinfo_length,
             NULL)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_INVALID_SERVERINFO_DATA);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
         return 0;
     }
     if (ctx->cert->key == NULL) {
@@ -850,7 +850,7 @@ int SSL_CTX_use_serverinfo_ex(SSL_CTX *ctx, unsigned int version,
      */
     if (!serverinfo_process_buffer(version, serverinfo, serverinfo_length,
             ctx)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_INVALID_SERVERINFO_DATA);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
         return 0;
     }
     return 1;
@@ -902,7 +902,7 @@ int SSL_CTX_use_serverinfo_file(SSL_CTX *ctx, const char *file)
              * There must be at least one extension in this file
              */
             if (num_extensions == 0) {
-                ERR_raise(ERR_LIB_SSL, SSL_R_NO_PEM_EXTENSIONS);
+                ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
                 goto end;
             } else /* End of file, we're done */
                 break;
@@ -910,18 +910,18 @@ int SSL_CTX_use_serverinfo_file(SSL_CTX *ctx, const char *file)
         /* Check that PEM name starts with "BEGIN SERVERINFO FOR " */
         name_len = (unsigned int)strlen(name);
         if (name_len < sizeof(NAME_PREFIX1) - 1) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_PEM_NAME_TOO_SHORT);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
             goto end;
         }
         if (HAS_PREFIX(name, NAME_PREFIX1)) {
             version = SSL_SERVERINFOV1;
         } else {
             if (name_len < sizeof(NAME_PREFIX2) - 1) {
-                ERR_raise(ERR_LIB_SSL, SSL_R_PEM_NAME_TOO_SHORT);
+                ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
                 goto end;
             }
             if (!HAS_PREFIX(name, NAME_PREFIX2)) {
-                ERR_raise(ERR_LIB_SSL, SSL_R_PEM_NAME_BAD_PREFIX);
+                ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
                 goto end;
             }
             version = SSL_SERVERINFOV2;
@@ -934,7 +934,7 @@ int SSL_CTX_use_serverinfo_file(SSL_CTX *ctx, const char *file)
             if (extension_length < 4
                 || (extension[2] << 8) + extension[3]
                     != extension_length - 4) {
-                ERR_raise(ERR_LIB_SSL, SSL_R_BAD_DATA);
+                ERR_raise(ERR_LIB_SSL, ERR_R_BAD_DATA);
                 goto end;
             }
         } else {
@@ -942,7 +942,7 @@ int SSL_CTX_use_serverinfo_file(SSL_CTX *ctx, const char *file)
             if (extension_length < 8
                 || (extension[6] << 8) + extension[7]
                     != extension_length - 8) {
-                ERR_raise(ERR_LIB_SSL, SSL_R_BAD_DATA);
+                ERR_raise(ERR_LIB_SSL, ERR_R_BAD_DATA);
                 goto end;
             }
         }
@@ -1016,39 +1016,39 @@ static int ssl_set_cert_and_key(SSL *ssl, SSL_CTX *ctx, X509 *x509, EVP_PKEY *pr
         if (EVP_PKEY_missing_parameters(privatekey)) {
             if (EVP_PKEY_missing_parameters(pubkey)) {
                 /* nobody has parameters? - error */
-                ERR_raise(ERR_LIB_SSL, SSL_R_MISSING_PARAMETERS);
+                ERR_raise(ERR_LIB_SSL, ERR_R_MISSING_REQUIRED_DATA);
                 goto out;
             } else {
                 /* copy to privatekey from pubkey */
                 if (!EVP_PKEY_copy_parameters(privatekey, pubkey)) {
-                    ERR_raise(ERR_LIB_SSL, SSL_R_COPY_PARAMETERS_FAILED);
+                    ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
                     goto out;
                 }
             }
         } else if (EVP_PKEY_missing_parameters(pubkey)) {
             /* copy to pubkey from privatekey */
             if (!EVP_PKEY_copy_parameters(pubkey, privatekey)) {
-                ERR_raise(ERR_LIB_SSL, SSL_R_COPY_PARAMETERS_FAILED);
+                ERR_raise(ERR_LIB_SSL, ERR_R_OPERATION_FAIL);
                 goto out;
             }
         } /* else both have parameters */
 
         /* check that key <-> cert match */
         if (EVP_PKEY_eq(pubkey, privatekey) != 1) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_PRIVATE_KEY_MISMATCH);
+            ERR_raise(ERR_LIB_SSL, ERR_R_MISMATCH);
             goto out;
         }
     }
     if (ssl_cert_lookup_by_pkey(pubkey, &i,
             sc != NULL ? SSL_CONNECTION_GET_CTX(sc) : ctx)
         == NULL) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_UNKNOWN_CERTIFICATE_TYPE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_UNKNOWN);
         goto out;
     }
 
     if (!override && (c->pkeys[i].x509 != NULL || c->pkeys[i].privatekey != NULL || c->pkeys[i].chain != NULL)) {
         /* No override, and something already there */
-        ERR_raise(ERR_LIB_SSL, SSL_R_NOT_REPLACING_CERTIFICATE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_WRONG_STATE);
         goto out;
     }
 

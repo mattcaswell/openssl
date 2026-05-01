@@ -221,7 +221,7 @@ static int test_default_cipherlist_clear(void)
     if (!TEST_int_eq(SSL_CTX_set_cipher_list(fixture->server, "no-such"), 0))
         goto end;
 
-    if (!TEST_int_eq(ERR_GET_REASON(ERR_get_error()), SSL_R_NO_CIPHER_MATCH))
+    if (!TEST_int_eq(ERR_GET_REASON(ERR_get_error()), ERR_R_NO_MATCH))
         goto end;
 
     s = SSL_new(fixture->client);
@@ -233,7 +233,7 @@ static int test_default_cipherlist_clear(void)
         goto end;
 
     if (!TEST_int_eq(ERR_GET_REASON(ERR_get_error()),
-            SSL_R_NO_CIPHER_MATCH))
+            ERR_R_NO_MATCH))
         goto end;
 
     result = 1;

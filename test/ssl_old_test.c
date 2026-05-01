@@ -1415,7 +1415,7 @@ int main(int argc, char *argv[])
     if (cipher != NULL) {
         if (strcmp(cipher, "") == 0) {
             if (!SSL_CTX_set_cipher_list(c_ctx, cipher)) {
-                if (ERR_GET_REASON(ERR_peek_error()) == SSL_R_NO_CIPHER_MATCH) {
+                if (ERR_GET_REASON(ERR_peek_error()) == ERR_R_NO_MATCH) {
                     ERR_clear_error();
                 } else {
                     ERR_print_errors(bio_err);
@@ -1428,7 +1428,7 @@ int main(int argc, char *argv[])
             }
 
             if (!SSL_CTX_set_cipher_list(s_ctx, cipher)) {
-                if (ERR_GET_REASON(ERR_peek_error()) == SSL_R_NO_CIPHER_MATCH) {
+                if (ERR_GET_REASON(ERR_peek_error()) == ERR_R_NO_MATCH) {
                     ERR_clear_error();
                 } else {
                     ERR_print_errors(bio_err);
@@ -1441,7 +1441,7 @@ int main(int argc, char *argv[])
             }
 
             if (!SSL_CTX_set_cipher_list(s_ctx2, cipher)) {
-                if (ERR_GET_REASON(ERR_peek_error()) == SSL_R_NO_CIPHER_MATCH) {
+                if (ERR_GET_REASON(ERR_peek_error()) == ERR_R_NO_MATCH) {
                     ERR_clear_error();
                 } else {
                     ERR_print_errors(bio_err);
