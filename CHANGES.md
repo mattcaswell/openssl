@@ -31,7 +31,6 @@ OpenSSL Releases
 
 ### Changes between 4.0 and 4.1 [xx XXX xxxx]
 
-
  * The library-specific error reason codes (SSL_R_*, EVP_R_*, etc.) have been
    deprecated in favor of a new set of stable, machine-readable ERR_R_* error
    codes.  Human-readable detail should be provided via the format string
@@ -40,7 +39,8 @@ OpenSSL Releases
    See the ERR_R_XXX(3) manual page for the complete list of machine-readable
    codes.
 
-   *Matt Caswell
+   *Matt Caswell*
+
  * Added test framework for testing function memory allocation failures.
 
    *Jakub Zelenka*
