@@ -8,16 +8,17 @@ ERR_R_XXX - OpenSSL machine-readable error reason codes
 
  #include <openssl/err.h>
 
+ERR_R_XXX
+
 =head1 DESCRIPTION
 
-The B<ERR_R_*> error reason codes are a set of stable, documented error codes
 that can be used for programmatic error handling.  Unlike the library-specific
 B<*_R_*> codes (such as B<SSL_R_*>, B<EVP_R_*>, etc.), these codes are not
 tied to any particular OpenSSL sub-library and may be raised by any part of
 the library.
 
 Human-readable detail should be provided alongside these codes via the
-format string argument to L<ERR_raise_data(3)> or L<SSLfatal_data(3)>.
+format string argument to L<ERR_raise_data(3)> or SSLfatal_data().
 This allows the error to carry both a stable machine-readable classification
 and a descriptive message that helps the user understand what went wrong.
 
@@ -231,7 +232,7 @@ An entity could not be identified (e.g. unknown cipher, unknown digest).
 
 =item B<ERR_R_DISABLED>
 
-A feature was disabled at compile time or runtime configuration.
+A feature was disabled at compile time or run time configuration.
 
 =item B<ERR_R_DEPRECATED>
 
@@ -293,6 +294,11 @@ An algorithm or provider fetch failed for reasons other than the
 algorithm being unsupported.
 
 =back
+
+=head1 RETURN VALUES
+
+These are error reason codes.  They are used with L<ERR_raise(3)> and
+L<ERR_raise_data(3)> and do not themselves return values.
 
 =head1 NOTES
 

@@ -114,7 +114,7 @@ use the equivalent machine-readable code with a descriptive format string:
                 "PSK identity is empty, violates RFC 8446");
 
 The complete list of machine-readable error codes can be found in
-L<ERR_R_XXX(3)>.
+L<ERR_R_XXX(7)>.
 
 =back
 
@@ -122,9 +122,6 @@ The library-specific B<*_R_*> reason codes (such as B<SSL_R_*>, B<EVP_R_*>,
 etc.) are deprecated.  They are retained for backward compatibility but new
 code should use the B<ERR_R_XXX> codes instead.  The library-specific codes
 may change between releases as OpenSSL's internals evolve.
-
-=head3 Other pieces of software
-=back
 
 =head3 Other pieces of software
 

@@ -43,10 +43,9 @@ is fatal, respectively.
 Starting with OpenSSL 3.0.0, the function code is always set to zero.
 
 =head1 NOTES
-=head1 NOTES
 
 Applications should use the documented B<ERR_R_*> error codes (see
-L<ERR_R_XXX(3)>) for control flow decisions and programmatic error handling.
+L<ERR_R_XXX(7)>) for control flow decisions and programmatic error handling.
 These codes are stable and will not change between releases.
 
 The library-specific B<*_R_*> reason codes (such as B<SSL_R_*>, B<EVP_R_*>,

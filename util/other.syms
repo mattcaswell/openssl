@@ -14,6 +14,7 @@ OPENSSL_MALLOC_SEED                     environment
 OPENSSL_instrument_bus                  assembler
 OPENSSL_instrument_bus2                 assembler
 #
+ERR_R_XXX                              environment
 ADMISSION_SYNTAX                        datatype
 ADMISSIONS                              datatype
 ASN1_AUX                                datatype
