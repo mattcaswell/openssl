@@ -1,0 +1,324 @@
+=pod
+
+=head1 NAME
+
+ERR_R_XXX - OpenSSL machine-readable error reason codes
+
+=head1 SYNOPSIS
+
+ #include <openssl/err.h>
+
+=head1 DESCRIPTION
+
+The B<ERR_R_*> error reason codes are a set of stable, documented error codes
+that can be used for programmatic error handling.  Unlike the library-specific
+B<*_R_*> codes (such as B<SSL_R_*>, B<EVP_R_*>, etc.), these codes are not
+tied to any particular OpenSSL sub-library and may be raised by any part of
+the library.
+
+Human-readable detail should be provided alongside these codes via the
+format string argument to L<ERR_raise_data(3)> or L<SSLfatal_data(3)>.
+This allows the error to carry both a stable machine-readable classification
+and a descriptive message that helps the user understand what went wrong.
+
+=head2 List of error codes
+
+The following error codes are available:
+
+=head3 Input and parameter validation errors
+
+=over 4
+
+=item B<ERR_R_PASSED_NULL_PARAMETER>
+
+A NULL pointer was passed where a non-NULL value was required.
+This typically indicates a programming error in the calling application.
+
+=item B<ERR_R_PASSED_INVALID_ARGUMENT>
+
+An argument had an invalid or unexpected value.
+
+=item B<ERR_R_INVALID_KEY>
+
+A key object was structurally invalid, had an unsupported algorithm, or
+contained corrupt key material.
+
+=item B<ERR_R_INVALID_CERTIFICATE>
+
+A certificate was structurally invalid or malformed.
+
+=item B<ERR_R_INVALID_FORMAT>
+
+Data was not in the expected encoding or format (e.g. PEM, ASN.1, DER
+parse failures).
+
+=item B<ERR_R_INVALID_LENGTH>
+
+A length or size value was outside the valid range.
+
+=item B<ERR_R_INVALID_ALGORITHM>
+
+An algorithm identifier was not recognized or not appropriate for the
+operation.
+
+=back
+
+=head3 Type and state errors
+
+=over 4
+
+=item B<ERR_R_WRONG_TYPE>
+
+An object or value was of the wrong type (e.g. expected a private key but
+received a certificate).
+
+=item B<ERR_R_WRONG_STATE>
+
+An operation was attempted when the relevant object or connection was in
+an inappropriate state (e.g. writing before a handshake completes).
+
+=item B<ERR_R_NOT_INITIALIZED>
+
+A required object or context had not been initialized.
+
+=item B<ERR_R_ALREADY_INITIALIZED>
+
+An attempt was made to initialize an object that was already initialized.
+
+=item B<ERR_R_IN_USE>
+
+A resource was already in use and could not be modified.
+
+=back
+
+=head3 Missing and not-found errors
+
+=over 4
+
+=item B<ERR_R_NOT_FOUND>
+
+A requested resource, object, or key could not be found.
+
+=item B<ERR_R_FILE_NOT_FOUND>
+
+A file could not be opened or read.
+
+=item B<ERR_R_MISSING_REQUIRED_DATA>
+
+Required data, a required field, or a required extension was absent.
+
+=item B<ERR_R_NO_MATCH>
+
+No compatible match was found (e.g. no shared cipher suite or signature
+algorithm).
+
+=back
+
+=head3 Protocol and communication errors
+
+=over 4
+
+=item B<ERR_R_HANDSHAKE_FAILURE>
+
+A TLS, DTLS, or QUIC handshake failed.
+
+=item B<ERR_R_PROTOCOL_ERROR>
+
+A protocol violation occurred (e.g. bad message format, unexpected message
+type, incorrect version number).
+
+=item B<ERR_R_UNEXPECTED_EOF>
+
+The connection was closed unexpectedly without a proper close_notify alert.
+This error reason code may be used for control flow decisions.
+
+=item B<ERR_R_BAD_DATA>
+
+Received data was corrupt or malformed.
+
+=item B<ERR_R_CONNECTION_FAILED>
+
+A network connection could not be established.
+
+=item B<ERR_R_TIMEOUT>
+
+An operation timed out.
+
+=item B<ERR_R_IO_ERROR>
+
+An I/O subsystem error occurred (e.g. BIO operation failed).
+
+=back
+
+=head3 Verification and security errors
+
+=over 4
+
+=item B<ERR_R_VERIFICATION_FAILED>
+
+A signature verification or MAC check failed.
+
+=item B<ERR_R_CERTIFICATE_VERIFICATION_FAILED>
+
+Certificate chain validation failed.
+
+=item B<ERR_R_MISMATCH>
+
+Components that should be consistent did not match
+(e.g. key type does not match certificate, digest algorithm mismatch).
+
+=item B<ERR_R_CONFLICT>
+
+Conflicting or inconsistent settings were detected (e.g. inconsistent
+extensions, conflicting algorithm names).
+
+=item B<ERR_R_SECURITY_VIOLATION>
+
+A security constraint was violated (e.g. weak key, insufficient security
+level, FIPS mode violation).
+
+=back
+
+=head3 Resource errors
+
+=over 4
+
+=item B<ERR_R_MALLOC_FAILURE>
+
+Memory allocation failed.
+
+=item B<ERR_R_INSUFFICIENT_RESOURCES>
+
+A resource limit was exceeded (e.g. too many streams, insufficient buffer
+space, random pool empty).
+
+=item B<ERR_R_OVERFLOW>
+
+A numeric or buffer overflow occurred.
+
+=back
+
+=head3 Encoding and parsing errors
+
+=over 4
+
+=item B<ERR_R_ENCODING_ERROR>
+
+An encoding or decoding operation failed.
+
+=item B<ERR_R_PARSE_ERROR>
+
+A parsing operation failed (e.g. ASN.1, PEM, configuration parse failure).
+
+=back
+
+=head3 Unsupported and unknown errors
+
+=over 4
+
+=item B<ERR_R_UNSUPPORTED>
+
+A feature, algorithm, or operation is not supported in the current
+configuration.
+
+=item B<ERR_R_NOT_IMPLEMENTED>
+
+Requested functionality is not implemented.
+
+=item B<ERR_R_UNKNOWN>
+
+An entity could not be identified (e.g. unknown cipher, unknown digest).
+
+=item B<ERR_R_DISABLED>
+
+A feature was disabled at compile time or runtime configuration.
+
+=item B<ERR_R_DEPRECATED>
+
+A deprecated API or feature was used.
+
+=back
+
+=head3 Internal and system errors
+
+=over 4
+
+=item B<ERR_R_INTERNAL_ERROR>
+
+An unexpected internal library error occurred.  This typically indicates a
+bug in OpenSSL or a provider.
+
+=item B<ERR_R_OPERATION_FAIL>
+
+An operation was started but did not complete successfully.
+
+=item B<ERR_R_INIT_FAIL>
+
+Initialization of the library or a subsystem failed.
+
+=item B<ERR_R_CONFIG_ERROR>
+
+A configuration file or property string could not be parsed.
+
+=item B<ERR_R_CALLBACK_FAILED>
+
+A user-supplied callback returned an error.
+
+=back
+
+=head3 Miscellaneous errors
+
+=over 4
+
+=item B<ERR_R_DUPLICATE>
+
+A duplicate entry was detected (e.g. duplicate extension, duplicate
+certificate).
+
+=item B<ERR_R_EXPIRED>
+
+A certificate, CRL, or timestamp has expired.
+
+=item B<ERR_R_INTERRUPTED>
+
+The operation was interrupted or cancelled.
+
+=item B<ERR_R_SELF_TEST_FAILURE>
+
+A FIPS self-test or known-answer test failed.
+
+=item B<ERR_R_FETCH_FAILED>
+
+An algorithm or provider fetch failed for reasons other than the
+algorithm being unsupported.
+
+=back
+
+=head1 NOTES
+
+Applications should use these codes for control flow decisions and
+programmatic error handling.  The library-specific B<*_R_*> codes are
+deprecated and may change between releases as OpenSSL's internals evolve.
+
+The B<ERR_R_*> codes are always combined with the B<ERR_RFLAG_COMMON> flag,
+which distinguishes them from library-specific reason codes.  This flag
+can be checked using ERR_GET_RFLAGS() and ERR_COMMON_ERROR().
+
+=head1 SEE ALSO
+
+L<ERR_raise(3)>, L<ERR_GET_LIB(3)>, L<ERR_put_error(3)>
+
+=head1 HISTORY
+
+The new set of B<ERR_R_*> error codes was added in OpenSSL 4.1.
+
+=head1 COPYRIGHT
+
+Copyright 2026 The OpenSSL Project Authors. All Rights Reserved.
+
+Licensed under the Apache License 2.0 (the "License").  You may not use
+this file except in compliance with the License.  You can obtain a copy
+in the file LICENSE in the source distribution or at
+L<https://www.openssl.org/source/license.html>.
+
+=cut
