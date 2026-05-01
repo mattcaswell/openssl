@@ -1462,7 +1462,7 @@ static int run_script_worker(struct helper *h, const struct script_op *script,
 
             if (allow_fail && c_stream == NULL) {
                 if (!TEST_size_t_eq(ERR_GET_REASON(ERR_get_error()),
-                        SSL_R_STREAM_COUNT_LIMITED))
+                        ERR_R_INSUFFICIENT_RESOURCES))
                     goto out;
 
                 ++h->fail_count;
@@ -2659,11 +2659,11 @@ static const struct script_op script_20_child[] = {
     OP_C_EXPECT_SSL_ERR(a, SSL_ERROR_SYSCALL),
 
     OP_EXPECT_ERR_LIB(ERR_LIB_SSL),
-    OP_EXPECT_ERR_REASON(SSL_R_PROTOCOL_IS_SHUTDOWN),
+    OP_EXPECT_ERR_REASON(ERR_R_WRONG_STATE),
 
     OP_POP_ERR(),
     OP_EXPECT_ERR_LIB(ERR_LIB_SSL),
-    OP_EXPECT_ERR_REASON(SSL_R_QUIC_NETWORK_ERROR),
+    OP_EXPECT_ERR_REASON(ERR_R_IO_ERROR),
 
     OP_C_FREE_STREAM(a),
 

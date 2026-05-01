@@ -50,7 +50,7 @@ static int tls1_set_crypto_state(OSSL_RECORD_LAYER *rl, int level,
     if (comp != NULL) {
         rl->compctx = COMP_CTX_new(comp);
         if (rl->compctx == NULL) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_COMPRESSION_LIBRARY_ERROR);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR);
             return OSSL_RECORD_RETURN_FATAL;
         }
     }
@@ -150,7 +150,7 @@ static int tls1_set_crypto_state(OSSL_RECORD_LAYER *rl, int level,
         if (mode == EVP_CIPH_CBC_MODE) {
             eivlen = EVP_CIPHER_CTX_get_iv_length(ciph_ctx);
             if (eivlen < 0) {
-                RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_LIBRARY_BUG);
+                RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
                 return OSSL_RECORD_RETURN_FATAL;
             }
             if (eivlen <= 1)
@@ -243,7 +243,7 @@ static int tls1_cipher(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *recs,
     bs = EVP_CIPHER_get_block_size(EVP_CIPHER_CTX_get0_cipher(ds));
 
     if (bs == 0) {
-        RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_CIPHER);
+        RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_ALGORITHM);
         return 0;
     }
 
@@ -255,7 +255,7 @@ static int tls1_cipher(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *recs,
              * We shouldn't have been called with pipeline data if the
              * cipher doesn't support pipelining
              */
-            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_PIPELINE_FAILURE);
+            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_OPERATION_FAIL);
             return 0;
         }
     }
@@ -316,7 +316,7 @@ static int tls1_cipher(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *recs,
         if (EVP_CIPHER_CTX_ctrl(ds, EVP_CTRL_SET_PIPELINE_OUTPUT_BUFS,
                 (int)n_recs, data)
             <= 0) {
-            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_PIPELINE_FAILURE);
+            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_OPERATION_FAIL);
             return 0;
         }
         /* Set the input buffers */
@@ -329,7 +329,7 @@ static int tls1_cipher(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *recs,
             || EVP_CIPHER_CTX_ctrl(ds, EVP_CTRL_SET_PIPELINE_INPUT_LENS,
                    (int)n_recs, reclen)
                 <= 0) {
-            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_PIPELINE_FAILURE);
+            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_OPERATION_FAIL);
             return 0;
         }
     }

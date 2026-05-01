@@ -74,7 +74,7 @@ int SSL_use_RSAPrivateKey_file(SSL *ssl, const char *file, int type)
             SSL_get_default_passwd_cb(ssl),
             SSL_get_default_passwd_cb_userdata(ssl));
     } else {
-        ERR_raise(ERR_LIB_SSL, SSL_R_BAD_SSL_FILETYPE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
         goto end;
     }
     if (rsa == NULL) {
@@ -165,7 +165,7 @@ int SSL_CTX_use_RSAPrivateKey_file(SSL_CTX *ctx, const char *file, int type)
             SSL_CTX_get_default_passwd_cb(ctx),
             SSL_CTX_get_default_passwd_cb_userdata(ctx));
     } else {
-        ERR_raise(ERR_LIB_SSL, SSL_R_BAD_SSL_FILETYPE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
         goto end;
     }
     if (rsa == NULL) {

@@ -142,7 +142,7 @@ static int test_unknown_frame(void)
         goto err;
 
     if (!TEST_int_eq(ERR_GET_REASON(ERR_peek_error()),
-            SSL_R_QUIC_PROTOCOL_ERROR))
+            ERR_R_PROTOCOL_ERROR))
         goto err;
 
     if (!TEST_true(qtest_check_server_frame_encoding_err(qtserv)))

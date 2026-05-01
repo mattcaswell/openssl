@@ -4813,7 +4813,7 @@ static int test_early_data_psk(int idx)
     switch (idx) {
     case 0:
         /* Set inconsistent SNI (early client detection) */
-        err = SSL_R_INCONSISTENT_EARLY_DATA_SNI;
+        err = ERR_R_CONFLICT;
         if (!TEST_true(SSL_SESSION_set1_hostname(sess, "goodhost"))
             || !TEST_true(SSL_set_tlsext_host_name(clientssl, "badhost")))
             goto end;
@@ -4821,7 +4821,7 @@ static int test_early_data_psk(int idx)
 
     case 1:
         /* Set inconsistent ALPN (early client detection) */
-        err = SSL_R_INCONSISTENT_EARLY_DATA_ALPN;
+        err = ERR_R_CONFLICT;
         /* SSL_set_alpn_protos returns 0 for success and 1 for failure */
         if (!TEST_true(SSL_SESSION_set1_alpn_selected(sess, GOODALPN,
                 GOODALPNLEN))
@@ -4836,7 +4836,7 @@ static int test_early_data_psk(int idx)
          * early_data too, but we test it here because it is similar to the
          * SNI/ALPN consistency tests.
          */
-        err = SSL_R_BAD_PSK;
+        err = ERR_R_INVALID_KEY;
         if (!TEST_true(SSL_SESSION_set_protocol_version(sess, TLS1_2_VERSION)))
             goto end;
         break;
@@ -5432,7 +5432,7 @@ static int test_ciphersuite_change(void)
     if (!TEST_false(create_ssl_connection(serverssl, clientssl,
             SSL_ERROR_SSL))
         || !TEST_int_eq(ERR_GET_REASON(ERR_get_error()),
-            SSL_R_CIPHERSUITE_DIGEST_HAS_CHANGED))
+            ERR_R_CONFLICT))
         goto end;
 
     testresult = 1;
@@ -7647,7 +7647,7 @@ static int test_key_update_local_in_write(int tst)
 
     /* SSL_key_update will fail, because writing in local*/
     if (!TEST_false(SSL_key_update(local, SSL_KEY_UPDATE_REQUESTED))
-        || !TEST_int_eq(ERR_GET_REASON(ERR_peek_error()), SSL_R_BAD_WRITE_RETRY))
+        || !TEST_int_eq(ERR_GET_REASON(ERR_peek_error()), ERR_R_WRONG_STATE))
         goto end;
 
     ERR_clear_error();
@@ -14231,7 +14231,7 @@ static int test_no_renegotiation(int idx)
      */
     if (!TEST_int_le(ret = SSL_connect(clientssl), 0)
         || !TEST_int_eq(SSL_get_error(clientssl, ret), SSL_ERROR_SSL)
-        || !TEST_int_eq(ERR_GET_REASON(ERR_get_error()), SSL_R_NO_RENEGOTIATION))
+        || !TEST_int_eq(ERR_GET_REASON(ERR_get_error()), ERR_R_UNSUPPORTED))
         goto end;
 
     testresult = 1;
@@ -14692,7 +14692,7 @@ static int test_http_verbs(int idx)
     ERR_clear_error();
     if (!TEST_int_le(SSL_accept(serverssl), 0))
         goto end;
-    if (!TEST_int_eq(ERR_GET_REASON(ERR_get_error()), SSL_R_HTTP_REQUEST))
+    if (!TEST_int_eq(ERR_GET_REASON(ERR_get_error()), ERR_R_PROTOCOL_ERROR))
         goto end;
 
     testresult = 1;

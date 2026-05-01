@@ -58,13 +58,13 @@ int tls_parse_ctos_renegotiate(SSL_CONNECTION *s, PACKET *pkt,
     /* Parse the length byte */
     if (!PACKET_get_1(pkt, &ilen)
         || !PACKET_get_bytes(pkt, &data, ilen)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_RENEGOTIATION_ENCODING_ERR);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_PROTOCOL_ERROR, "protocol encoding error in extension");
         return 0;
     }
 
     /* Check that the extension matches */
     if (ilen != s->s3.previous_client_finished_len) {
-        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_RENEGOTIATION_MISMATCH);
+        SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_MISMATCH, "renegotiation version mismatch");
         return 0;
     }
 
@@ -78,7 +78,7 @@ int tls_parse_ctos_renegotiate(SSL_CONNECTION *s, PACKET *pkt,
     }
 #endif
     if (ok) {
-        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_RENEGOTIATION_MISMATCH);
+        SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_MISMATCH, "renegotiation version mismatch");
         return 0;
     }
 
@@ -119,7 +119,7 @@ int tls_parse_ctos_server_name(SSL_CONNECTION *s, PACKET *pkt,
     if (!PACKET_as_length_prefixed_2(pkt, &sni)
         /* ServerNameList must be at least 1 byte long. */
         || PACKET_remaining(&sni) == 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed server_name extension");
         return 0;
     }
 
@@ -137,7 +137,7 @@ int tls_parse_ctos_server_name(SSL_CONNECTION *s, PACKET *pkt,
     if (!PACKET_get_1(&sni, &servname_type)
         || servname_type != TLSEXT_NAMETYPE_host_name
         || !PACKET_as_length_prefixed_2(&sni, &hostname)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed server_name extension");
         return 0;
     }
 
@@ -147,12 +147,12 @@ int tls_parse_ctos_server_name(SSL_CONNECTION *s, PACKET *pkt,
      */
     if (!s->hit || SSL_CONNECTION_IS_TLS13(s)) {
         if (PACKET_remaining(&hostname) > TLSEXT_MAXLEN_host_name) {
-            SSLfatal(s, SSL_AD_UNRECOGNIZED_NAME, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_UNRECOGNIZED_NAME, ERR_R_INVALID_FORMAT, "unrecognized server name");
             return 0;
         }
 
         if (PACKET_contains_zero_byte(&hostname)) {
-            SSLfatal(s, SSL_AD_UNRECOGNIZED_NAME, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_UNRECOGNIZED_NAME, ERR_R_INVALID_FORMAT, "unrecognized server name");
             return 0;
         }
 
@@ -163,7 +163,7 @@ int tls_parse_ctos_server_name(SSL_CONNECTION *s, PACKET *pkt,
         OPENSSL_free(s->ext.hostname);
         s->ext.hostname = NULL;
         if (!PACKET_strndup(&hostname, &s->ext.hostname)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_server_name");
             return 0;
         }
 
@@ -189,14 +189,13 @@ int tls_parse_ctos_maxfragmentlen(SSL_CONNECTION *s, PACKET *pkt,
     unsigned int value;
 
     if (PACKET_remaining(pkt) != 1 || !PACKET_get_1(pkt, &value)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed max_fragment_length extension");
         return 0;
     }
 
     /* Received |value| should be a valid max-fragment-length code. */
     if (!IS_MAX_FRAGMENT_LENGTH_EXT_VALID(value)) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER,
-            SSL_R_TLS_EXT_INVALID_MAX_FRAGMENT_LENGTH);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_LENGTH, "invalid max fragment length");
         return 0;
     }
 
@@ -232,12 +231,12 @@ int tls_parse_ctos_srp(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
 
     if (!PACKET_as_length_prefixed_1(pkt, &srp_I)
         || PACKET_contains_zero_byte(&srp_I)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed srp extension");
         return 0;
     }
 
     if (!PACKET_strndup(&srp_I, &s->srp_ctx.login)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_srp");
         return 0;
     }
 
@@ -253,7 +252,7 @@ int tls_parse_ctos_ec_pt_formats(SSL_CONNECTION *s, PACKET *pkt,
 
     if (!PACKET_as_length_prefixed_1(pkt, &ec_point_format_list)
         || PACKET_remaining(&ec_point_format_list) == 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed ec_point_formats extension");
         return 0;
     }
 
@@ -261,7 +260,7 @@ int tls_parse_ctos_ec_pt_formats(SSL_CONNECTION *s, PACKET *pkt,
         if (!PACKET_memdup(&ec_point_format_list,
                 &s->ext.peer_ecpointformats,
                 &s->ext.peer_ecpointformats_len)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_ec_pt_formats");
             return 0;
         }
     }
@@ -274,7 +273,7 @@ int tls_parse_ctos_session_ticket(SSL_CONNECTION *s, PACKET *pkt,
     X509 *x, size_t chainidx)
 {
     if (s->ext.session_ticket_cb && !s->ext.session_ticket_cb(SSL_CONNECTION_GET_USER_SSL(s), PACKET_data(pkt), (int)PACKET_remaining(pkt), s->ext.session_ticket_cb_arg)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_session_ticket");
         return 0;
     }
 
@@ -290,7 +289,7 @@ int tls_parse_ctos_sig_algs_cert(SSL_CONNECTION *s, PACKET *pkt,
 
     if (!PACKET_as_length_prefixed_2(pkt, &supported_sig_algs)
         || PACKET_remaining(&supported_sig_algs) == 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed signature_algorithms_cert extension");
         return 0;
     }
 
@@ -301,7 +300,7 @@ int tls_parse_ctos_sig_algs_cert(SSL_CONNECTION *s, PACKET *pkt,
      */
     if ((!s->server || (s->server && !s->hit))
         && !tls1_save_sigalgs(s, &supported_sig_algs, 1)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed signature_algorithms_cert extension");
         return 0;
     }
 
@@ -315,7 +314,7 @@ int tls_parse_ctos_sig_algs(SSL_CONNECTION *s, PACKET *pkt,
 
     if (!PACKET_as_length_prefixed_2(pkt, &supported_sig_algs)
         || PACKET_remaining(&supported_sig_algs) == 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed signature_algorithms extension");
         return 0;
     }
 
@@ -326,7 +325,7 @@ int tls_parse_ctos_sig_algs(SSL_CONNECTION *s, PACKET *pkt,
      */
     if ((!s->server || (s->server && !s->hit))
         && !tls1_save_sigalgs(s, &supported_sig_algs, 0)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed signature_algorithms extension");
         return 0;
     }
 
@@ -358,7 +357,7 @@ int tls_parse_ctos_status_request(SSL_CONNECTION *s, PACKET *pkt,
         return 1;
 
     if (!PACKET_get_1(pkt, (unsigned int *)&s->ext.status_type)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed status_request extension");
         return 0;
     }
 
@@ -371,7 +370,7 @@ int tls_parse_ctos_status_request(SSL_CONNECTION *s, PACKET *pkt,
     }
 
     if (!PACKET_get_length_prefixed_2(pkt, &responder_id_list)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed status_request extension");
         return 0;
     }
 
@@ -383,7 +382,7 @@ int tls_parse_ctos_status_request(SSL_CONNECTION *s, PACKET *pkt,
     if (PACKET_remaining(&responder_id_list) > 0) {
         s->ext.ocsp.ids = sk_OCSP_RESPID_new_null();
         if (s->ext.ocsp.ids == NULL) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB, "crypto library error processing extension");
             return 0;
         }
     } else {
@@ -397,7 +396,7 @@ int tls_parse_ctos_status_request(SSL_CONNECTION *s, PACKET *pkt,
 
         if (!PACKET_get_length_prefixed_2(&responder_id_list, &responder_id)
             || PACKET_remaining(&responder_id) == 0) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed status_request extension");
             return 0;
         }
 
@@ -405,20 +404,20 @@ int tls_parse_ctos_status_request(SSL_CONNECTION *s, PACKET *pkt,
         id = d2i_OCSP_RESPID(NULL, &id_data,
             (int)PACKET_remaining(&responder_id));
         if (id == NULL) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed status_request extension");
             return 0;
         }
 
         if (id_data != PACKET_end(&responder_id)) {
             OCSP_RESPID_free(id);
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed status_request extension");
 
             return 0;
         }
 
         if (!sk_OCSP_RESPID_push(s->ext.ocsp.ids, id)) {
             OCSP_RESPID_free(id);
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_status_request");
 
             return 0;
         }
@@ -426,7 +425,7 @@ int tls_parse_ctos_status_request(SSL_CONNECTION *s, PACKET *pkt,
 
     /* Read in request_extensions */
     if (!PACKET_as_length_prefixed_2(pkt, &exts)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed status_request extension");
         return 0;
     }
 
@@ -437,7 +436,7 @@ int tls_parse_ctos_status_request(SSL_CONNECTION *s, PACKET *pkt,
             X509_EXTENSION_free);
         s->ext.ocsp.exts = d2i_X509_EXTENSIONS(NULL, &ext_data, (int)PACKET_remaining(&exts));
         if (s->ext.ocsp.exts == NULL || ext_data != PACKET_end(&exts)) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed status_request extension");
             return 0;
         }
     }
@@ -475,7 +474,7 @@ int tls_parse_ctos_alpn(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
 
     if (!PACKET_as_length_prefixed_2(pkt, &protocol_list)
         || PACKET_remaining(&protocol_list) < 2) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed alpn extension");
         return 0;
     }
 
@@ -484,7 +483,7 @@ int tls_parse_ctos_alpn(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
         /* Protocol names can't be empty. */
         if (!PACKET_get_length_prefixed_1(&protocol_list, &protocol)
             || PACKET_remaining(&protocol) == 0) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed alpn extension");
             return 0;
         }
     } while (PACKET_remaining(&protocol_list) != 0);
@@ -494,7 +493,7 @@ int tls_parse_ctos_alpn(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
     s->s3.alpn_proposed_len = 0;
     if (!PACKET_memdup(&save_protocol_list,
             &s->s3.alpn_proposed, &s->s3.alpn_proposed_len)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_alpn");
         return 0;
     }
 
@@ -518,8 +517,7 @@ int tls_parse_ctos_use_srtp(SSL_CONNECTION *s, PACKET *pkt,
     /* Pull off the length of the cipher suite list  and check it is even */
     if (!PACKET_get_net_2(pkt, &ct) || (ct & 1) != 0
         || !PACKET_get_sub_packet(pkt, &subpkt, ct)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR,
-            SSL_R_BAD_SRTP_PROTECTION_PROFILE_LIST);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_PASSED_INVALID_ARGUMENT, "invalid argument in extension");
         return 0;
     }
 
@@ -530,8 +528,7 @@ int tls_parse_ctos_use_srtp(SSL_CONNECTION *s, PACKET *pkt,
 
     while (PACKET_remaining(&subpkt)) {
         if (!PACKET_get_net_2(&subpkt, &id)) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR,
-                SSL_R_BAD_SRTP_PROTECTION_PROFILE_LIST);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_PASSED_INVALID_ARGUMENT, "invalid argument in key share");
             return 0;
         }
 
@@ -554,14 +551,13 @@ int tls_parse_ctos_use_srtp(SSL_CONNECTION *s, PACKET *pkt,
 
     /* Now extract the MKI value as a sanity check, but discard it for now */
     if (!PACKET_get_1(pkt, &mki_len)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR,
-            SSL_R_BAD_SRTP_PROTECTION_PROFILE_LIST);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_PASSED_INVALID_ARGUMENT, "invalid argument in extension");
         return 0;
     }
 
     if (!PACKET_forward(pkt, mki_len)
         || PACKET_remaining(pkt)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_SRTP_MKI_VALUE);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_PASSED_INVALID_ARGUMENT, "invalid SRTP parameter");
         return 0;
     }
 
@@ -592,7 +588,7 @@ int tls_parse_ctos_psk_kex_modes(SSL_CONNECTION *s, PACKET *pkt,
 
     if (!PACKET_as_length_prefixed_1(pkt, &psk_kex_modes)
         || PACKET_remaining(&psk_kex_modes) == 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed psk_key_exchange_modes extension");
         return 0;
     }
 
@@ -642,16 +638,14 @@ static int tls_accept_ksgroup(SSL_CONNECTION *s, uint16_t ksgroup, PACKET *encod
     /* Cache the selected group ID in the SSL_SESSION */
     s->session->kex_group = ksgroup;
     if ((s->s3.peer_tmp = ssl_generate_param_group(s, ksgroup)) == NULL) {
-        SSLfatal(s,
-            SSL_AD_INTERNAL_ERROR,
-            SSL_R_UNABLE_TO_FIND_ECDH_PARAMETERS);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_NOT_FOUND, "ECDH parameters not found");
         return 0;
     }
     if (tls13_set_encoded_pub_key(s->s3.peer_tmp,
             PACKET_data(encoded_pubkey),
             PACKET_remaining(encoded_pubkey))
         <= 0) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_KEY_SHARE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_KEY, "invalid key share in extension");
         return 0;
     }
     return 1;
@@ -689,13 +683,13 @@ static KS_EXTRACTION_RESULT extract_keyshares(SSL_CONNECTION *s, PACKET *key_sha
     *keyshares_arr = OPENSSL_malloc_array(MAX_KEY_SHARES,
         sizeof(**keyshares_arr));
     if (*keyshares_arr == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_accept_ksgroup");
         goto failure;
     }
     *encoded_pubkey_arr = OPENSSL_malloc_array(MAX_KEY_SHARES,
         sizeof(**encoded_pubkey_arr));
     if (*encoded_pubkey_arr == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_accept_ksgroup");
         goto failure;
     }
 
@@ -709,7 +703,7 @@ static KS_EXTRACTION_RESULT extract_keyshares(SSL_CONNECTION *s, PACKET *key_sha
         if (!PACKET_get_net_2(key_share_list, &group_id)
             || !PACKET_get_length_prefixed_2(key_share_list, &encoded_pubkey)
             || PACKET_remaining(&encoded_pubkey) == 0) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_MISMATCH);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH, "extension data length mismatch");
             goto failure;
         }
 
@@ -720,7 +714,7 @@ static KS_EXTRACTION_RESULT extract_keyshares(SSL_CONNECTION *s, PACKET *key_sha
         if (s->s3.group_id != 0
             && (group_id != s->s3.group_id
                 || PACKET_remaining(key_share_list) != 0)) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_KEY_SHARE);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_KEY, "invalid key share in extension");
             goto failure;
         }
 
@@ -733,7 +727,7 @@ static KS_EXTRACTION_RESULT extract_keyshares(SSL_CONNECTION *s, PACKET *key_sha
          * message indicating the client discrepancy.
          */
         if (!check_in_list(s, group_id, clntgroups, clnt_num_groups, 0, &key_share_pos)) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_KEY_SHARE);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_KEY, "invalid key share in extension");
             goto failure;
         }
 
@@ -851,12 +845,12 @@ int tls_parse_ctos_key_share(SSL_CONNECTION *s, PACKET *pkt,
 
     /* Sanity check */
     if (s->s3.peer_tmp != NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_key_share");
         return 0;
     }
 
     if (!PACKET_as_length_prefixed_2(pkt, &key_share_list)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_MISMATCH);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH, "extension data length mismatch");
         return 0;
     }
 
@@ -872,8 +866,7 @@ int tls_parse_ctos_key_share(SSL_CONNECTION *s, PACKET *pkt,
          * because we verify that the length is non-zero when we process that
          * extension.
          */
-        SSLfatal(s, SSL_AD_MISSING_EXTENSION,
-            SSL_R_MISSING_SUPPORTED_GROUPS_EXTENSION);
+        SSLfatal_data(s, SSL_AD_MISSING_EXTENSION, ERR_R_MISSING_REQUIRED_DATA, "missing key share extension after HRR");
         return 0;
     }
 
@@ -883,7 +876,7 @@ int tls_parse_ctos_key_share(SSL_CONNECTION *s, PACKET *pkt,
          * requesting a new key_share. If we haven't got one then that is an
          * error
          */
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_KEY_SHARE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_KEY, "invalid key share in extension");
         return 0;
     }
 
@@ -1028,7 +1021,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
         return 1;
 
     if (!PACKET_as_length_prefixed_2(pkt, &cookie)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_MISMATCH);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH, "extension data length mismatch");
         return 0;
     }
 
@@ -1037,7 +1030,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
     rawlen = PACKET_remaining(&raw);
     if (rawlen < SHA256_DIGEST_LENGTH
         || !PACKET_forward(&raw, rawlen - SHA256_DIGEST_LENGTH)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_MISMATCH);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH, "extension data length mismatch");
         return 0;
     }
     mdin = PACKET_data(&raw);
@@ -1051,7 +1044,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
     if (hctx == NULL || pkey == NULL) {
         EVP_MD_CTX_free(hctx);
         EVP_PKEY_free(pkey);
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "EVP error processing extension");
         return 0;
     }
 
@@ -1065,7 +1058,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
         || hmaclen != SHA256_DIGEST_LENGTH) {
         EVP_MD_CTX_free(hctx);
         EVP_PKEY_free(pkey);
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_cookie");
         return 0;
     }
 
@@ -1073,12 +1066,12 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
     EVP_PKEY_free(pkey);
 
     if (CRYPTO_memcmp(hmac, mdin, SHA256_DIGEST_LENGTH) != 0) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_COOKIE_MISMATCH);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISMATCH, "parameter mismatch in extension");
         return 0;
     }
 
     if (!PACKET_get_net_2(&cookie, &format)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_MISMATCH);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH, "extension data length mismatch");
         return 0;
     }
     /* Check the cookie format is something we recognise. Ignore it if not */
@@ -1092,23 +1085,22 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
 
     /* Check the version number is sane */
     if (!PACKET_get_net_2(&cookie, &version)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_MISMATCH);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH, "extension data length mismatch");
         return 0;
     }
     if (version != TLS1_3_VERSION) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER,
-            SSL_R_BAD_PROTOCOL_VERSION_NUMBER);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_PROTOCOL_ERROR, "protocol error in cookie extension");
         return 0;
     }
 
     if (!PACKET_get_net_2(&cookie, &group_id)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_MISMATCH);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH, "extension data length mismatch");
         return 0;
     }
 
     ciphdata = PACKET_data(&cookie);
     if (!PACKET_forward(&cookie, 2)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_MISMATCH);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH, "extension data length mismatch");
         return 0;
     }
     if (group_id != s->s3.group_id
@@ -1118,7 +1110,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
          * We chose a different cipher or group id this time around to what is
          * in the cookie. Something must have changed.
          */
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_CIPHER);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_ALGORITHM, "invalid cipher in extension");
         return 0;
     }
 
@@ -1127,7 +1119,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
         || !PACKET_get_length_prefixed_2(&cookie, &chhash)
         || !PACKET_get_length_prefixed_1(&cookie, &appcookie)
         || PACKET_remaining(&cookie) != SHA256_DIGEST_LENGTH) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_MISMATCH);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_LENGTH, "extension data length mismatch");
         return 0;
     }
 
@@ -1143,7 +1135,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
             PACKET_data(&appcookie),
             PACKET_remaining(&appcookie))
         == 0) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_COOKIE_MISMATCH);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISMATCH, "parameter mismatch in extension");
         return 0;
     }
 
@@ -1153,7 +1145,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
      * Note: This won't work with custom HRR extensions
      */
     if (!WPACKET_init_static_len(&hrrpkt, hrr, sizeof(hrr), 0)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_cookie");
         return 0;
     }
     if (!WPACKET_put_bytes_u8(&hrrpkt, SSL3_MT_SERVER_HELLO)
@@ -1167,7 +1159,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
         || !WPACKET_put_bytes_u8(&hrrpkt, 0)
         || !WPACKET_start_sub_packet_u16(&hrrpkt)) {
         WPACKET_cleanup(&hrrpkt);
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_cookie");
         return 0;
     }
     if (!WPACKET_put_bytes_u16(&hrrpkt, TLSEXT_TYPE_supported_versions)
@@ -1175,7 +1167,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
         || !WPACKET_put_bytes_u16(&hrrpkt, s->version)
         || !WPACKET_close(&hrrpkt)) {
         WPACKET_cleanup(&hrrpkt);
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_cookie");
         return 0;
     }
     if (key_share) {
@@ -1184,7 +1176,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
             || !WPACKET_put_bytes_u16(&hrrpkt, s->s3.group_id)
             || !WPACKET_close(&hrrpkt)) {
             WPACKET_cleanup(&hrrpkt);
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_cookie");
             return 0;
         }
     }
@@ -1197,7 +1189,7 @@ int tls_parse_ctos_cookie(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
         || !WPACKET_get_total_written(&hrrpkt, &hrrlen)
         || !WPACKET_finish(&hrrpkt)) {
         WPACKET_cleanup(&hrrpkt);
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_cookie");
         return 0;
     }
 
@@ -1228,7 +1220,7 @@ int tls_parse_ctos_supported_groups(SSL_CONNECTION *s, PACKET *pkt,
     if (!PACKET_as_length_prefixed_2(pkt, &supported_groups_list)
         || PACKET_remaining(&supported_groups_list) == 0
         || (PACKET_remaining(&supported_groups_list) % 2) != 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed supported_groups extension");
         return 0;
     }
 
@@ -1246,7 +1238,7 @@ int tls_parse_ctos_supported_groups(SSL_CONNECTION *s, PACKET *pkt,
         if (!tls1_save_u16(&supported_groups_list,
                 &s->ext.peer_supportedgroups,
                 &s->ext.peer_supportedgroups_len, MAX_SUPPORTED_GROUPS)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_supported_groups");
             return 0;
         }
     }
@@ -1259,7 +1251,7 @@ int tls_parse_ctos_ems(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
 {
     /* The extension must always be empty */
     if (PACKET_remaining(pkt) != 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed extended_master_secret extension");
         return 0;
     }
 
@@ -1275,12 +1267,12 @@ int tls_parse_ctos_early_data(SSL_CONNECTION *s, PACKET *pkt, unsigned int conte
     X509 *x, size_t chainidx)
 {
     if (PACKET_remaining(pkt) != 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed early_data extension");
         return 0;
     }
 
     if (s->hello_retry_request != SSL_HRR_NONE) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "illegal extension parameter");
         return 0;
     }
 
@@ -1337,7 +1329,7 @@ int tls_parse_ctos_psk(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
         return 1;
 
     if (!PACKET_get_length_prefixed_2(pkt, &identities)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed pre_shared_key extension");
         return 0;
     }
 
@@ -1349,7 +1341,7 @@ int tls_parse_ctos_psk(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
 
         if (!PACKET_get_length_prefixed_2(&identities, &identity)
             || !PACKET_get_net_4(&identities, &ticket_agel)) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed pre_shared_key extension");
             return 0;
         }
 
@@ -1357,7 +1349,7 @@ int tls_parse_ctos_psk(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
         if (s->psk_find_session_cb != NULL
             && !s->psk_find_session_cb(ussl, PACKET_data(&identity), idlen,
                 &sess)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "internal error: invalid format");
             return 0;
         }
 
@@ -1370,14 +1362,14 @@ int tls_parse_ctos_psk(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
             unsigned int pskdatalen;
 
             if (!PACKET_strndup(&identity, &pskid)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_psk");
                 return 0;
             }
             pskdatalen = s->psk_server_callback(ussl, pskid, pskdata,
                 sizeof(pskdata));
             OPENSSL_free(pskid);
             if (pskdatalen > PSK_MAX_PSK_LEN) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_psk");
                 return 0;
             } else if (pskdatalen > 0) {
                 const SSL_CIPHER *cipher;
@@ -1391,7 +1383,7 @@ int tls_parse_ctos_psk(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
                     tls13_aes128gcmsha256_id);
                 if (cipher == NULL) {
                     OPENSSL_cleanse(pskdata, pskdatalen);
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_psk");
                     return 0;
                 }
 
@@ -1403,7 +1395,7 @@ int tls_parse_ctos_psk(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
                     || !SSL_SESSION_set_protocol_version(sess,
                         TLS1_3_VERSION)) {
                     OPENSSL_cleanse(pskdata, pskdatalen);
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_psk");
                     goto err;
                 }
                 OPENSSL_cleanse(pskdata, pskdatalen);
@@ -1416,7 +1408,7 @@ int tls_parse_ctos_psk(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
             SSL_SESSION *sesstmp = ssl_session_dup(sess, 0);
 
             if (sesstmp == NULL) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_psk");
                 goto err;
             }
             SSL_SESSION_free(sess);
@@ -1451,13 +1443,13 @@ int tls_parse_ctos_psk(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
                     &sess);
 
             if (ret == SSL_TICKET_EMPTY) {
-                SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+                SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed pre_shared_key extension");
                 return 0;
             }
 
             if (ret == SSL_TICKET_FATAL_ERR_MALLOC
                 || ret == SSL_TICKET_FATAL_ERR_OTHER) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_psk");
                 return 0;
             }
             if (ret == SSL_TICKET_NONE || ret == SSL_TICKET_NO_DECRYPT)
@@ -1503,7 +1495,7 @@ int tls_parse_ctos_psk(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
 
         md = ssl_md(sctx, sess->cipher->algorithm2);
         if (md == NULL) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_psk");
             goto err;
         }
         if (!EVP_MD_is_a(md,
@@ -1533,19 +1525,19 @@ int tls_parse_ctos_psk(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
         goto err;
 
     if (!PACKET_get_length_prefixed_2(pkt, &binders)) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed pre_shared_key extension");
         goto err;
     }
 
     for (i = 0; i <= id; i++) {
         if (!PACKET_get_length_prefixed_1(&binders, &binder)) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed pre_shared_key extension");
             goto err;
         }
     }
 
     if (PACKET_remaining(&binder) != (size_t)hashsize) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed pre_shared_key extension");
         goto err;
     }
     if (tls_psk_do_binder(s, md, PACKET_msg_start(pkt), binderoffset,
@@ -1571,8 +1563,7 @@ int tls_parse_ctos_post_handshake_auth(SSL_CONNECTION *s, PACKET *pkt,
     ossl_unused size_t chainidx)
 {
     if (PACKET_remaining(pkt) != 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR,
-            SSL_R_POST_HANDSHAKE_AUTH_ENCODING_ERR);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_PROTOCOL_ERROR, "protocol error in post handshake auth");
         return 0;
     }
 
@@ -1601,7 +1592,7 @@ EXT_RETURN tls_construct_stoc_renegotiate(SSL_CONNECTION *s, WPACKET *pkt,
             s->s3.previous_server_finished_len)
         || !WPACKET_close(pkt)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1624,7 +1615,7 @@ EXT_RETURN tls_construct_stoc_server_name(SSL_CONNECTION *s, WPACKET *pkt,
 
     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_server_name)
         || !WPACKET_put_bytes_u16(pkt, 0)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1647,7 +1638,7 @@ EXT_RETURN tls_construct_stoc_maxfragmentlen(SSL_CONNECTION *s, WPACKET *pkt,
         || !WPACKET_start_sub_packet_u16(pkt)
         || !WPACKET_put_bytes_u8(pkt, s->session->ext.max_fragment_len_mode)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1673,7 +1664,7 @@ EXT_RETURN tls_construct_stoc_ec_pt_formats(SSL_CONNECTION *s, WPACKET *pkt,
         || !WPACKET_start_sub_packet_u16(pkt)
         || !WPACKET_sub_memcpy_u8(pkt, plist, plistlen)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1695,7 +1686,7 @@ EXT_RETURN tls_construct_stoc_supported_groups(SSL_CONNECTION *s, WPACKET *pkt,
     /* Get our list of supported groups */
     tls1_get_supported_groups(s, &groups, &numgroups);
     if (numgroups == 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1719,21 +1710,21 @@ EXT_RETURN tls_construct_stoc_supported_groups(SSL_CONNECTION *s, WPACKET *pkt,
                     /* Sub-packet for supported_groups extension */
                     || !WPACKET_start_sub_packet_u16(pkt)
                     || !WPACKET_start_sub_packet_u16(pkt)) {
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
                     return EXT_RETURN_FAIL;
                 }
 
                 first = 0;
             }
             if (!WPACKET_put_bytes_u16(pkt, group)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
                 return EXT_RETURN_FAIL;
             }
         }
     }
 
     if (!WPACKET_close(pkt) || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1751,7 +1742,7 @@ EXT_RETURN tls_construct_stoc_session_ticket(SSL_CONNECTION *s, WPACKET *pkt,
 
     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_session_ticket)
         || !WPACKET_put_bytes_u16(pkt, 0)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1781,7 +1772,7 @@ EXT_RETURN tls_construct_stoc_status_request(SSL_CONNECTION *s, WPACKET *pkt,
 
     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_status_request)
         || !WPACKET_start_sub_packet_u16(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1796,7 +1787,7 @@ EXT_RETURN tls_construct_stoc_status_request(SSL_CONNECTION *s, WPACKET *pkt,
         return EXT_RETURN_FAIL;
     }
     if (!WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1824,7 +1815,7 @@ EXT_RETURN tls_construct_stoc_next_proto_neg(SSL_CONNECTION *s, WPACKET *pkt,
     if (ret == SSL_TLSEXT_ERR_OK) {
         if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_next_proto_neg)
             || !WPACKET_sub_memcpy_u16(pkt, npa, npalen)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
             return EXT_RETURN_FAIL;
         }
         s->s3.npn_seen = 1;
@@ -1849,7 +1840,7 @@ EXT_RETURN tls_construct_stoc_alpn(SSL_CONNECTION *s, WPACKET *pkt, unsigned int
             s->s3.alpn_selected_len)
         || !WPACKET_close(pkt)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1870,7 +1861,7 @@ EXT_RETURN tls_construct_stoc_use_srtp(SSL_CONNECTION *s, WPACKET *pkt,
         || !WPACKET_put_bytes_u16(pkt, s->srtp_profile->id)
         || !WPACKET_put_bytes_u8(pkt, 0)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1901,7 +1892,7 @@ EXT_RETURN tls_construct_stoc_etm(SSL_CONNECTION *s, WPACKET *pkt,
 
     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_encrypt_then_mac)
         || !WPACKET_put_bytes_u16(pkt, 0)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1917,7 +1908,7 @@ EXT_RETURN tls_construct_stoc_ems(SSL_CONNECTION *s, WPACKET *pkt,
 
     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_extended_master_secret)
         || !WPACKET_put_bytes_u16(pkt, 0)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1929,7 +1920,7 @@ EXT_RETURN tls_construct_stoc_supported_versions(SSL_CONNECTION *s, WPACKET *pkt
     size_t chainidx)
 {
     if (!ossl_assert(SSL_CONNECTION_IS_TLS13(s))) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1937,7 +1928,7 @@ EXT_RETURN tls_construct_stoc_supported_versions(SSL_CONNECTION *s, WPACKET *pkt
         || !WPACKET_start_sub_packet_u16(pkt)
         || !WPACKET_put_bytes_u16(pkt, s->version)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -1963,7 +1954,7 @@ EXT_RETURN tls_construct_stoc_key_share(SSL_CONNECTION *s, WPACKET *pkt,
             || !WPACKET_start_sub_packet_u16(pkt)
             || !WPACKET_put_bytes_u16(pkt, s->s3.group_id)
             || !WPACKET_close(pkt)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
             return EXT_RETURN_FAIL;
         }
 
@@ -1973,7 +1964,7 @@ EXT_RETURN tls_construct_stoc_key_share(SSL_CONNECTION *s, WPACKET *pkt,
     if (ckey == NULL) {
         /* No key_share received from client - must be resuming */
         if (!s->hit || !tls13_generate_handshake_secret(s, NULL, 0)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
             return EXT_RETURN_FAIL;
         }
         return EXT_RETURN_NOT_SENT;
@@ -1992,14 +1983,14 @@ EXT_RETURN tls_construct_stoc_key_share(SSL_CONNECTION *s, WPACKET *pkt,
     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_key_share)
         || !WPACKET_start_sub_packet_u16(pkt)
         || !WPACKET_put_bytes_u16(pkt, s->s3.group_id)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
     if ((ginf = tls1_group_id_lookup(SSL_CONNECTION_GET_CTX(s),
              s->s3.group_id))
         == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -2007,21 +1998,21 @@ EXT_RETURN tls_construct_stoc_key_share(SSL_CONNECTION *s, WPACKET *pkt,
         /* Regular KEX */
         skey = ssl_generate_pkey(s, ckey);
         if (skey == NULL) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_SSL_LIB);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_SSL_LIB, "SSL library error processing extension");
             return EXT_RETURN_FAIL;
         }
 
         /* Generate encoding of server key */
         encoded_pubkey_len = EVP_PKEY_get1_encoded_public_key(skey, &encoded_pubkey);
         if (encoded_pubkey_len == 0) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EC_LIB);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EC_LIB, "EC library error processing extension");
             EVP_PKEY_free(skey);
             return EXT_RETURN_FAIL;
         }
 
         if (!WPACKET_sub_memcpy_u16(pkt, encoded_pubkey, encoded_pubkey_len)
             || !WPACKET_close(pkt)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
             EVP_PKEY_free(skey);
             OPENSSL_free(encoded_pubkey);
             return EXT_RETURN_FAIL;
@@ -2054,14 +2045,14 @@ EXT_RETURN tls_construct_stoc_key_share(SSL_CONNECTION *s, WPACKET *pkt,
         }
 
         if (ctlen == 0) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
             OPENSSL_free(ct);
             return EXT_RETURN_FAIL;
         }
 
         if (!WPACKET_sub_memcpy_u16(pkt, ct, ctlen)
             || !WPACKET_close(pkt)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
             OPENSSL_free(ct);
             return EXT_RETURN_FAIL;
         }
@@ -2101,7 +2092,7 @@ EXT_RETURN tls_construct_stoc_cookie(SSL_CONNECTION *s, WPACKET *pkt,
         return EXT_RETURN_NOT_SENT;
 
     if (sctx->gen_stateless_cookie_cb == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_NO_COOKIE_CALLBACK_SET);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_MISSING_REQUIRED_DATA, "required cookie callback not set");
         return EXT_RETURN_FAIL;
     }
 
@@ -2120,7 +2111,7 @@ EXT_RETURN tls_construct_stoc_cookie(SSL_CONNECTION *s, WPACKET *pkt,
         || !WPACKET_put_bytes_u64(pkt, time(NULL))
         || !WPACKET_start_sub_packet_u16(pkt)
         || !WPACKET_reserve_bytes(pkt, EVP_MAX_MD_SIZE, &hashval1)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -2140,7 +2131,7 @@ EXT_RETURN tls_construct_stoc_cookie(SSL_CONNECTION *s, WPACKET *pkt,
         || !WPACKET_close(pkt)
         || !WPACKET_start_sub_packet_u8(pkt)
         || !WPACKET_reserve_bytes(pkt, SSL_COOKIE_LENGTH, &appcookie1)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -2148,7 +2139,7 @@ EXT_RETURN tls_construct_stoc_cookie(SSL_CONNECTION *s, WPACKET *pkt,
     if (sctx->gen_stateless_cookie_cb(ussl, appcookie1,
             &appcookielen)
         == 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_COOKIE_GEN_CALLBACK_FAILURE);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CALLBACK_FAILED, "cookie generation callback failed");
         return EXT_RETURN_FAIL;
     }
 
@@ -2157,14 +2148,14 @@ EXT_RETURN tls_construct_stoc_cookie(SSL_CONNECTION *s, WPACKET *pkt,
         || !WPACKET_close(pkt)
         || !WPACKET_get_total_written(pkt, &totcookielen)
         || !WPACKET_reserve_bytes(pkt, SHA256_DIGEST_LENGTH, &hmac)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
     hmaclen = SHA256_DIGEST_LENGTH;
 
     totcookielen -= startlen;
     if (!ossl_assert(totcookielen <= MAX_COOKIE_SIZE - SHA256_DIGEST_LENGTH)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -2175,7 +2166,7 @@ EXT_RETURN tls_construct_stoc_cookie(SSL_CONNECTION *s, WPACKET *pkt,
         s->session_ctx->ext.cookie_hmac_key,
         sizeof(s->session_ctx->ext.cookie_hmac_key));
     if (hctx == NULL || pkey == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "EVP error processing extension");
         goto err;
     }
 
@@ -2185,12 +2176,12 @@ EXT_RETURN tls_construct_stoc_cookie(SSL_CONNECTION *s, WPACKET *pkt,
         || EVP_DigestSign(hctx, hmac, &hmaclen, cookie,
                totcookielen)
             <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         goto err;
     }
 
     if (!ossl_assert(totcookielen + hmaclen <= MAX_COOKIE_SIZE)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         goto err;
     }
 
@@ -2199,7 +2190,7 @@ EXT_RETURN tls_construct_stoc_cookie(SSL_CONNECTION *s, WPACKET *pkt,
         || !ossl_assert(cookie == hmac - totcookielen)
         || !WPACKET_close(pkt)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         goto err;
     }
 
@@ -2235,7 +2226,7 @@ EXT_RETURN tls_construct_stoc_cryptopro_bug(SSL_CONNECTION *s, WPACKET *pkt,
         return EXT_RETURN_NOT_SENT;
 
     if (!WPACKET_memcpy(pkt, cryptopro_ext, sizeof(cryptopro_ext))) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -2254,7 +2245,7 @@ EXT_RETURN tls_construct_stoc_early_data(SSL_CONNECTION *s, WPACKET *pkt,
             || !WPACKET_start_sub_packet_u16(pkt)
             || !WPACKET_put_bytes_u32(pkt, s->max_early_data)
             || !WPACKET_close(pkt)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
             return EXT_RETURN_FAIL;
         }
 
@@ -2267,7 +2258,7 @@ EXT_RETURN tls_construct_stoc_early_data(SSL_CONNECTION *s, WPACKET *pkt,
     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_early_data)
         || !WPACKET_start_sub_packet_u16(pkt)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -2285,7 +2276,7 @@ EXT_RETURN tls_construct_stoc_psk(SSL_CONNECTION *s, WPACKET *pkt,
         || !WPACKET_start_sub_packet_u16(pkt)
         || !WPACKET_put_bytes_u16(pkt, s->ext.tick_identity)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
 
@@ -2300,7 +2291,7 @@ EXT_RETURN tls_construct_stoc_client_cert_type(SSL_CONNECTION *sc, WPACKET *pkt,
         && (send_certificate_request(sc)
             || sc->post_handshake_auth == SSL_PHA_EXT_RECEIVED)) {
         /* Did not receive an acceptable cert type - and doing client auth */
-        SSLfatal(sc, SSL_AD_UNSUPPORTED_CERTIFICATE, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(sc, SSL_AD_UNSUPPORTED_CERTIFICATE, ERR_R_INVALID_FORMAT, "malformed certificate extension");
         return EXT_RETURN_FAIL;
     }
 
@@ -2326,7 +2317,7 @@ EXT_RETURN tls_construct_stoc_client_cert_type(SSL_CONNECTION *sc, WPACKET *pkt,
         || !WPACKET_start_sub_packet_u16(pkt)
         || !WPACKET_put_bytes_u8(pkt, sc->ext.client_cert_type)
         || !WPACKET_close(pkt)) {
-        SSLfatal(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_post_handshake_auth");
         return EXT_RETURN_FAIL;
     }
     return EXT_RETURN_SENT;
@@ -2365,17 +2356,17 @@ int tls_parse_ctos_client_cert_type(SSL_CONNECTION *sc, PACKET *pkt,
 
     if (!PACKET_as_length_prefixed_1(pkt, &supported_cert_types)) {
         sc->ext.client_cert_type_ctos = OSSL_CERT_TYPE_CTOS_ERROR;
-        SSLfatal(sc, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(sc, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed certificate_authorities extension");
         return 0;
     }
     if ((len = PACKET_remaining(&supported_cert_types)) == 0) {
         sc->ext.client_cert_type_ctos = OSSL_CERT_TYPE_CTOS_ERROR;
-        SSLfatal(sc, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(sc, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed certificate_authorities extension");
         return 0;
     }
     if (!PACKET_get_bytes(&supported_cert_types, &data, len)) {
         sc->ext.client_cert_type_ctos = OSSL_CERT_TYPE_CTOS_ERROR;
-        SSLfatal(sc, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(sc, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed certificate_authorities extension");
         return 0;
     }
     /* client_cert_type: client (peer) has priority */
@@ -2407,7 +2398,7 @@ EXT_RETURN tls_construct_stoc_server_cert_type(SSL_CONNECTION *sc, WPACKET *pkt,
         || !WPACKET_start_sub_packet_u16(pkt)
         || !WPACKET_put_bytes_u8(pkt, sc->ext.server_cert_type)
         || !WPACKET_close(pkt)) {
-        SSLfatal(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_client_cert_type");
         return EXT_RETURN_FAIL;
     }
     return EXT_RETURN_SENT;
@@ -2429,16 +2420,16 @@ int tls_parse_ctos_server_cert_type(SSL_CONNECTION *sc, PACKET *pkt,
     }
 
     if (!PACKET_as_length_prefixed_1(pkt, &supported_cert_types)) {
-        SSLfatal(sc, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(sc, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed certificate_authorities extension");
         return 0;
     }
 
     if ((len = PACKET_remaining(&supported_cert_types)) == 0) {
-        SSLfatal(sc, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(sc, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed certificate_authorities extension");
         return 0;
     }
     if (!PACKET_get_bytes(&supported_cert_types, &data, len)) {
-        SSLfatal(sc, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(sc, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed certificate_authorities extension");
         return 0;
     }
     /* server_cert_type: server (this) has priority */
@@ -2449,7 +2440,7 @@ int tls_parse_ctos_server_cert_type(SSL_CONNECTION *sc, PACKET *pkt,
         return 1;
 
     /* Did not receive an acceptable cert type */
-    SSLfatal(sc, SSL_AD_UNSUPPORTED_CERTIFICATE, SSL_R_BAD_EXTENSION);
+    SSLfatal_data(sc, SSL_AD_UNSUPPORTED_CERTIFICATE, ERR_R_INVALID_FORMAT, "malformed certificate extension");
     return 0;
 }
 
@@ -2480,7 +2471,7 @@ int tls_parse_ctos_ech(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
     }
     if (s->ext.ech.attempted_type != TLSEXT_TYPE_ech) {
         /* if/when new versions of ECH are added we'll update here */
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "illegal extension parameter");
         return 0;
     }
     /*
@@ -2489,16 +2480,16 @@ int tls_parse_ctos_ech(SSL_CONNECTION *s, PACKET *pkt, unsigned int context,
      */
     if (PACKET_get_1(pkt, &echtype) != 1
         || PACKET_remaining(pkt) != 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "malformed encrypted_client_hello extension");
         return 0;
     }
     if (echtype != OSSL_ECH_INNER_CH_TYPE) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "illegal extension parameter");
         return 0;
     }
     s->ext.ech.inner_ech_seen_ok = 1;
     if (s->ext.ech.success != 1 && s->ext.ech.backend != 1) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "illegal extension parameter");
         return 0;
     }
     /* yay - we're ok with this */
@@ -2535,7 +2526,7 @@ EXT_RETURN tls_construct_stoc_ech(SSL_CONNECTION *s, WPACKET *pkt,
 
         if (!WPACKET_put_bytes_u16(pkt, s->ext.ech.attempted_type)
             || !WPACKET_sub_memcpy_u16(pkt, eightzeros, 8)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_ech");
             return 0;
         }
         OSSL_TRACE_BEGIN(TLS)
@@ -2554,12 +2545,12 @@ EXT_RETURN tls_construct_stoc_ech(SSL_CONNECTION *s, WPACKET *pkt,
         if (RAND_bytes_ex(sctx->libctx, randomconf, 8,
                 RAND_DRBG_STRENGTH)
             <= 0) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_ech");
             return 0;
         }
         if (!WPACKET_put_bytes_u16(pkt, s->ext.ech.attempted_type)
             || !WPACKET_sub_memcpy_u16(pkt, randomconf, 8)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_ech");
             return 0;
         }
         OSSL_TRACE_BEGIN(TLS)
@@ -2592,7 +2583,7 @@ EXT_RETURN tls_construct_stoc_ech(SSL_CONNECTION *s, WPACKET *pkt,
         return EXT_RETURN_NOT_SENT;
     }
     if (ossl_ech_get_retry_configs(s, &rcfgs, &rcfgslen) != 1) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_ech");
         return 0;
     }
     if (rcfgslen == 0) {
@@ -2610,7 +2601,7 @@ EXT_RETURN tls_construct_stoc_ech(SSL_CONNECTION *s, WPACKET *pkt,
         || !WPACKET_start_sub_packet_u16(pkt)
         || !WPACKET_sub_memcpy_u16(pkt, rcfgs, rcfgslen)
         || !WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls_parse_ctos_ech");
         OPENSSL_free(rcfgs);
         return 0;
     }

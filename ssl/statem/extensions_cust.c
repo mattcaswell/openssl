@@ -138,7 +138,7 @@ int custom_ext_parse(SSL_CONNECTION *s, unsigned int context,
          * extensions not sent in ClientHello.
          */
         if ((meth->ext_flags & SSL_EXT_FLAG_SENT) == 0) {
-            SSLfatal(s, TLS1_AD_UNSUPPORTED_EXTENSION, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, TLS1_AD_UNSUPPORTED_EXTENSION, ERR_R_INVALID_FORMAT, "custom extension not sent in ClientHello but server tried to send it");
             return 0;
         }
     }
@@ -159,7 +159,7 @@ int custom_ext_parse(SSL_CONNECTION *s, unsigned int context,
     if (meth->parse_cb(SSL_CONNECTION_GET_USER_SSL(s), ext_type, context, ext_data,
             ext_size, x, chainidx, &al, meth->parse_arg)
         <= 0) {
-        SSLfatal(s, al, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, al, ERR_R_INVALID_FORMAT, "custom extension parse callback returned error");
         return 0;
     }
 
@@ -207,7 +207,7 @@ int custom_ext_add(SSL_CONNECTION *s, int context, WPACKET *pkt, X509 *x,
                             OSSL_ECH_OUTERS_MAX);
                     }
                     OSSL_TRACE_END(TLS);
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "too many ECH outer extensions to compress");
                     return 0;
                 }
                 s->ext.ech.outer_only[s->ext.ech.n_outer_only] = meth->ext_type;
@@ -234,7 +234,7 @@ int custom_ext_add(SSL_CONNECTION *s, int context, WPACKET *pkt, X509 *x,
                 /* we gotta find the relevant index to copy over this ext */
                 if (s->clienthello == NULL
                     || s->clienthello->pre_proc_exts == NULL) {
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "missing ClientHello or pre_proc_exts for ECH compression");
                     return 0;
                 }
                 raws = s->clienthello->pre_proc_exts;
@@ -245,14 +245,14 @@ int custom_ext_add(SSL_CONNECTION *s, int context, WPACKET *pkt, X509 *x,
                     }
                 }
                 if (tind == -1) {
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "extension not found in pre_proc_exts for ECH compression");
                     return 0;
                 }
                 if (ossl_ech_copy_inner2outer(s, meth->ext_type, tind,
                         pkt)
                     != OSSL_ECH_SAME_EXT_DONE) {
                     /* for custom exts, we really should have found it */
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_EXTENSION);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_FORMAT, "ECH copy_inner2outer failed for custom extension");
                     return 0;
                 }
                 /* we're done with that one now */
@@ -276,7 +276,7 @@ int custom_ext_add(SSL_CONNECTION *s, int context, WPACKET *pkt, X509 *x,
 
             if (cb_retval < 0) {
                 if (!for_comp)
-                    SSLfatal(s, al, SSL_R_CALLBACK_FAILED);
+                    SSLfatal_data(s, al, ERR_R_CALLBACK_FAILED, "custom extension add callback returned error");
                 return 0; /* error */
             }
             if (cb_retval == 0)
@@ -291,7 +291,7 @@ int custom_ext_add(SSL_CONNECTION *s, int context, WPACKET *pkt, X509 *x,
                 meth->free_cb(SSL_CONNECTION_GET_USER_SSL(s), meth->ext_type,
                     context, out, meth->add_arg);
             if (!for_comp)
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to write custom extension data to handshake");
             return 0;
         }
         if ((context & SSL_EXT_CLIENT_HELLO) != 0) {
@@ -303,7 +303,7 @@ int custom_ext_add(SSL_CONNECTION *s, int context, WPACKET *pkt, X509 *x,
                     meth->free_cb(SSL_CONNECTION_GET_USER_SSL(s), meth->ext_type,
                         context, out, meth->add_arg);
                 if (!for_comp)
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "duplicate custom extension would be sent");
                 return 0;
             }
             /*

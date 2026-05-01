@@ -66,9 +66,9 @@ static int fail_due_to_record_overflow(int enc)
     int reason;
 
     if (enc)
-        reason = SSL_R_ENCRYPTED_LENGTH_TOO_LONG;
+        reason = ERR_R_INVALID_LENGTH;
     else
-        reason = SSL_R_DATA_LENGTH_TOO_LONG;
+        reason = ERR_R_INVALID_LENGTH;
 
     if (ERR_GET_LIB(err) == ERR_LIB_SSL
         && ERR_GET_REASON(err) == reason)

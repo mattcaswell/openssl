@@ -352,15 +352,15 @@ static int ktls_read_n(OSSL_RECORD_LAYER *rl, size_t n, size_t max, int extend,
         switch (errno) {
         case EBADMSG:
             RLAYERfatal(rl, SSL_AD_BAD_RECORD_MAC,
-                SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC);
+                ERR_R_VERIFICATION_FAILED);
             break;
         case EMSGSIZE:
             RLAYERfatal(rl, SSL_AD_RECORD_OVERFLOW,
-                SSL_R_PACKET_LENGTH_TOO_LONG);
+                ERR_R_INVALID_LENGTH);
             break;
         case EINVAL:
             RLAYERfatal(rl, SSL_AD_PROTOCOL_VERSION,
-                SSL_R_WRONG_VERSION_NUMBER);
+                ERR_R_MISMATCH);
             break;
         default:
             break;
@@ -380,7 +380,7 @@ static int ktls_cipher(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *inrecs,
 static int ktls_validate_record_header(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *rec)
 {
     if (rec->rec_version != TLS1_2_VERSION) {
-        RLAYERfatal(rl, SSL_AD_DECODE_ERROR, SSL_R_WRONG_VERSION_NUMBER);
+        RLAYERfatal(rl, SSL_AD_DECODE_ERROR, ERR_R_MISMATCH);
         return 0;
     }
 

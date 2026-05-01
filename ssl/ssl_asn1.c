@@ -285,14 +285,14 @@ SSL_SESSION *d2i_SSL_SESSION_ex(SSL_SESSION **a, const unsigned char **pp,
     }
 
     if (as->version != SSL_SESSION_ASN1_VERSION) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_UNKNOWN_SSL_VERSION);
+        ERR_raise(ERR_LIB_SSL, ERR_R_UNKNOWN);
         goto err;
     }
 
     if ((as->ssl_version >> 8) != SSL3_VERSION_MAJOR
         && (as->ssl_version >> 8) != DTLS1_VERSION_MAJOR
         && as->ssl_version != DTLS1_BAD_VER) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_UNSUPPORTED_SSL_VERSION);
+        ERR_raise(ERR_LIB_SSL, ERR_R_UNSUPPORTED);
         goto err;
     }
 
@@ -301,7 +301,7 @@ SSL_SESSION *d2i_SSL_SESSION_ex(SSL_SESSION **a, const unsigned char **pp,
     ret->kex_group = as->kex_group;
 
     if (as->cipher->length != 2) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_CIPHER_CODE_WRONG_LENGTH);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
         goto err;
     }
 
@@ -381,7 +381,7 @@ SSL_SESSION *d2i_SSL_SESSION_ex(SSL_SESSION **a, const unsigned char **pp,
 #ifndef OPENSSL_NO_COMP
     if (as->comp_id) {
         if (as->comp_id->length != 1) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_BAD_LENGTH);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
             goto err;
         }
         ret->compress_meth = as->comp_id->data[0];

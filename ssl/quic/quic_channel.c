@@ -3510,7 +3510,7 @@ void ossl_quic_channel_raise_protocol_error_loc(QUIC_CHANNEL *ch,
     QUIC_TERMINATE_CAUSE tcause = { 0 };
     int err_reason = error_code == OSSL_QUIC_ERR_INTERNAL_ERROR
         ? ERR_R_INTERNAL_ERROR
-        : SSL_R_QUIC_PROTOCOL_ERROR;
+        : ERR_R_PROTOCOL_ERROR;
     const char *err_str = ossl_quic_err_to_string(error_code);
     const char *err_str_pfx = " (", *err_str_sfx = ")";
     const char *ft_str = NULL;

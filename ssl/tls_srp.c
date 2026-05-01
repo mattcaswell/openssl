@@ -321,7 +321,7 @@ int srp_generate_server_master_secret(SSL_CONNECTION *s)
 
     tmp_len = BN_num_bytes(K);
     if ((tmp = OPENSSL_malloc(tmp_len)) == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB, "memory allocation failed for SRP premaster secret");
         goto err;
     }
     BN_bn2bin(K, tmp);
@@ -350,13 +350,13 @@ int srp_generate_client_master_secret(SSL_CONNECTION *s)
                 sctx->libctx, sctx->propq))
             == NULL
         || s->srp_ctx.SRP_give_srp_client_pwd_callback == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "SRP parameter verification failed (B mod N or u calc)");
         goto err;
     }
     if ((passwd = s->srp_ctx.SRP_give_srp_client_pwd_callback(SSL_CONNECTION_GET_USER_SSL(s),
              s->srp_ctx.SRP_cb_arg))
         == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_CALLBACK_FAILED);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CALLBACK_FAILED, "SRP password callback returned NULL");
         goto err;
     }
     if ((x = SRP_Calc_x_ex(s->srp_ctx.s, s->srp_ctx.login, passwd,
@@ -368,13 +368,13 @@ int srp_generate_client_master_secret(SSL_CONNECTION *s)
                 sctx->libctx,
                 sctx->propq))
             == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "SRP key calculation failed (Calc_x or Calc_client_key)");
         goto err;
     }
 
     tmp_len = BN_num_bytes(K);
     if ((tmp = OPENSSL_malloc(tmp_len)) == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB, "memory allocation failed for SRP key");
         goto err;
     }
     BN_bn2bin(K, tmp);
@@ -398,12 +398,12 @@ int srp_verify_server_param(SSL_CONNECTION *s)
      */
     if (BN_ucmp(srp->g, srp->N) >= 0 || BN_ucmp(srp->B, srp->N) >= 0
         || BN_is_zero(srp->B)) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_DATA);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_BAD_DATA, "SRP parameter B is out of range (B >= N or B == 0)");
         return 0;
     }
 
     if (BN_num_bits(srp->N) < srp->strength) {
-        SSLfatal(s, SSL_AD_INSUFFICIENT_SECURITY, SSL_R_INSUFFICIENT_SECURITY);
+        SSLfatal_data(s, SSL_AD_INSUFFICIENT_SECURITY, ERR_R_SECURITY_VIOLATION, "SRP prime N is too weak (less than strength parameter)");
         return 0;
     }
 
@@ -411,12 +411,12 @@ int srp_verify_server_param(SSL_CONNECTION *s)
         if (srp->SRP_verify_param_callback(SSL_CONNECTION_GET_USER_SSL(s),
                 srp->SRP_cb_arg)
             <= 0) {
-            SSLfatal(s, SSL_AD_INSUFFICIENT_SECURITY, SSL_R_CALLBACK_FAILED);
+            SSLfatal_data(s, SSL_AD_INSUFFICIENT_SECURITY, ERR_R_CALLBACK_FAILED, "SRP verification callback rejected parameters");
             return 0;
         }
     } else if (!SRP_check_known_gN_param(srp->g, srp->N)) {
-        SSLfatal(s, SSL_AD_INSUFFICIENT_SECURITY,
-            SSL_R_INSUFFICIENT_SECURITY);
+        SSLfatal_data(s, SSL_AD_INSUFFICIENT_SECURITY,
+            ERR_R_SECURITY_VIOLATION, "SRP g,N pair is not a known group");
         return 0;
     }
 

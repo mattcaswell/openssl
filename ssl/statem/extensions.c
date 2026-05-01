@@ -830,7 +830,7 @@ int tls_collect_extensions(SSL_CONNECTION *s, PACKET *packet,
     num_exts = OSSL_NELEM(ext_defs) + (exts != NULL ? exts->meths_count : 0);
     raw_extensions = OPENSSL_calloc(num_exts, sizeof(*raw_extensions));
     if (raw_extensions == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB, "memory allocation failed for extension parsing");
         return 0;
     }
 
@@ -841,7 +841,7 @@ int tls_collect_extensions(SSL_CONNECTION *s, PACKET *packet,
         RAW_EXTENSION *thisex;
 
         if (!PACKET_get_net_2(&extensions, &type) || !PACKET_get_length_prefixed_2(&extensions, &extension)) {
-            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "failed to parse extension type from ClientHello");
             goto err;
         }
         /*
@@ -854,7 +854,7 @@ int tls_collect_extensions(SSL_CONNECTION *s, PACKET *packet,
             || (type == TLSEXT_TYPE_psk
                 && (context & SSL_EXT_CLIENT_HELLO) != 0
                 && PACKET_remaining(&extensions) != 0)) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EXTENSION);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "duplicate extension received");
             goto err;
         }
         idx = (unsigned int)(thisex - raw_extensions);
@@ -883,8 +883,8 @@ int tls_collect_extensions(SSL_CONNECTION *s, PACKET *packet,
                 && type == TLSEXT_TYPE_cryptopro_bug)
 #endif
         ) {
-            SSLfatal(s, SSL_AD_UNSUPPORTED_EXTENSION,
-                SSL_R_UNSOLICITED_EXTENSION);
+            SSLfatal_data(s, SSL_AD_UNSUPPORTED_EXTENSION,
+                ERR_R_PROTOCOL_ERROR, "unsolicited extension received from server");
             goto err;
         }
         if (thisex != NULL) {
@@ -1070,7 +1070,7 @@ int tls_construct_extensions(SSL_CONNECTION *s, WPACKET *pkt,
             && !WPACKET_set_flags(pkt,
                 WPACKET_FLAGS_ABANDON_ON_ZERO_LENGTH))) {
         if (!for_comp)
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to construct message during extension init");
         return 0;
     }
 
@@ -1157,14 +1157,14 @@ int tls_construct_extensions(SSL_CONNECTION *s, WPACKET *pkt,
         || s->ext.ech.grease == OSSL_ECH_IS_GREASE) {
         if (!WPACKET_close(pkt)) {
             if (!for_comp)
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "extension parse function not found for type");
             return 0;
         }
     }
 #else
     if (!WPACKET_close(pkt)) {
         if (!for_comp)
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to initialise extension before parsing");
         return 0;
     }
 #endif
@@ -1188,8 +1188,8 @@ static int final_renegotiate(SSL_CONNECTION *s, unsigned int context, int sent)
         if (!(s->options & SSL_OP_LEGACY_SERVER_CONNECT)
             && !(s->options & SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION)
             && !sent) {
-            SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
-                SSL_R_UNSAFE_LEGACY_RENEGOTIATION_DISABLED);
+            SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE,
+                ERR_R_SECURITY_VIOLATION, "unsafe legacy renegotiation disabled");
             return 0;
         }
 
@@ -1200,8 +1200,8 @@ static int final_renegotiate(SSL_CONNECTION *s, unsigned int context, int sent)
     if (s->renegotiate
         && !(s->options & SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION)
         && !sent) {
-        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
-            SSL_R_UNSAFE_LEGACY_RENEGOTIATION_DISABLED);
+        SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE,
+            ERR_R_SECURITY_VIOLATION, "unsafe legacy renegotiation disabled");
         return 0;
     }
 
@@ -1240,7 +1240,7 @@ static int init_ech(SSL_CONNECTION *s, unsigned int context)
 
     /* we don't need this assert everywhere - anywhere is fine */
     if (!ossl_assert(TLSEXT_IDX_num_builtins == nexts)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to parse or validate received extensions");
         return 0;
     }
     if ((context & SSL_EXT_CLIENT_HELLO) != 0)
@@ -1252,7 +1252,7 @@ static int final_ech(SSL_CONNECTION *s, unsigned int context, int sent)
 {
     if (s->server && s->ext.ech.success == 1
         && s->ext.ech.inner_ech_seen_ok != 1) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_ECH_REQUIRED);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISSING_REQUIRED_DATA, "mandatory extension missing from message");
         return 0;
     }
     return 1;
@@ -1269,7 +1269,7 @@ static int final_server_name(SSL_CONNECTION *s, unsigned int context, int sent)
     int was_ticket = (SSL_get_options(ssl) & SSL_OP_NO_TICKET) == 0;
 
     if (!ossl_assert(sctx != NULL) || !ossl_assert(s->session_ctx != NULL)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to get extension data from message");
         return 0;
     }
 
@@ -1294,7 +1294,7 @@ static int final_server_name(SSL_CONNECTION *s, unsigned int context, int sent)
             OPENSSL_free(s->session->ext.hostname);
             s->session->ext.hostname = OPENSSL_strdup(s->ext.hostname);
             if (s->session->ext.hostname == NULL && s->ext.hostname != NULL) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to parse extension data");
             }
         }
     }
@@ -1329,11 +1329,11 @@ static int final_server_name(SSL_CONNECTION *s, unsigned int context, int sent)
                 ss->ext.tick_lifetime_hint = 0;
                 ss->ext.tick_age_add = 0;
                 if (!ssl_generate_session_id(s, ss)) {
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to set extension WPACKET during construction");
                     return 0;
                 }
             } else {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to close extension WPACKET during construction");
                 return 0;
             }
         }
@@ -1341,7 +1341,7 @@ static int final_server_name(SSL_CONNECTION *s, unsigned int context, int sent)
 
     switch (ret) {
     case SSL_TLSEXT_ERR_ALERT_FATAL:
-        SSLfatal(s, altmp, SSL_R_CALLBACK_FAILED);
+        SSLfatal_data(s, altmp, ERR_R_CALLBACK_FAILED, "extension construction callback returned error");
         return 0;
 
     case SSL_TLSEXT_ERR_ALERT_WARNING:
@@ -1390,8 +1390,7 @@ static int final_ec_pt_formats(SSL_CONNECTION *s, unsigned int context,
                 break;
         }
         if (i == s->ext.peer_ecpointformats_len) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER,
-                SSL_R_TLS_INVALID_ECPOINTFORMAT_LIST);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_FORMAT, "invalid format in final ec pt formats");
             return 0;
         }
     }
@@ -1536,7 +1535,7 @@ static int final_ems(SSL_CONNECTION *s, unsigned int context, int sent)
      */
     if (!(s->s3.flags & TLS1_FLAGS_RECEIVED_EXTMS)
         && (s->s3.flags & TLS1_FLAGS_REQUIRED_EXTMS)) {
-        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_INCONSISTENT_EXTMS);
+        SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_CONFLICT, "renegotiation version mismatch");
         return 0;
     }
     if (!s->server && s->hit) {
@@ -1545,7 +1544,7 @@ static int final_ems(SSL_CONNECTION *s, unsigned int context, int sent)
          * original session.
          */
         if (!(s->s3.flags & TLS1_FLAGS_RECEIVED_EXTMS) != !(s->session->flags & SSL_SESS_FLAG_EXTMS)) {
-            SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_INCONSISTENT_EXTMS);
+            SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_CONFLICT, "renegotiation mismatch extension received");
             return 0;
         }
     }
@@ -1573,7 +1572,7 @@ static EXT_RETURN tls_construct_certificate_authorities(SSL_CONNECTION *s,
 
     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_certificate_authorities)
         || !WPACKET_start_sub_packet_u16(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to initialise renegotiation extension");
         return EXT_RETURN_FAIL;
     }
 
@@ -1583,7 +1582,7 @@ static EXT_RETURN tls_construct_certificate_authorities(SSL_CONNECTION *s,
     }
 
     if (!WPACKET_close(pkt)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to initialise server-side extensions");
         return EXT_RETURN_FAIL;
     }
 
@@ -1597,7 +1596,7 @@ static int tls_parse_certificate_authorities(SSL_CONNECTION *s, PACKET *pkt,
     if (!parse_ca_names(s, pkt))
         return 0;
     if (PACKET_remaining(pkt) != 0) {
-        SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(s, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "failed to parse supported groups extension");
         return 0;
     }
     return 1;
@@ -1616,8 +1615,8 @@ static int init_srtp(SSL_CONNECTION *s, unsigned int context)
 static int final_sig_algs(SSL_CONNECTION *s, unsigned int context, int sent)
 {
     if (!sent && SSL_CONNECTION_IS_TLS13(s) && !s->hit) {
-        SSLfatal(s, TLS13_AD_MISSING_EXTENSION,
-            SSL_R_MISSING_SIGALGS_EXTENSION);
+        SSLfatal_data(s, TLS13_AD_MISSING_EXTENSION,
+            ERR_R_MISSING_REQUIRED_DATA, "missing supported_versions extension");
         return 0;
     }
 
@@ -1628,8 +1627,8 @@ static int final_supported_versions(SSL_CONNECTION *s, unsigned int context,
     int sent)
 {
     if (!sent && context == SSL_EXT_TLS1_3_HELLO_RETRY_REQUEST) {
-        SSLfatal(s, TLS13_AD_MISSING_EXTENSION,
-            SSL_R_MISSING_SUPPORTED_VERSIONS_EXTENSION);
+        SSLfatal_data(s, TLS13_AD_MISSING_EXTENSION,
+            ERR_R_MISSING_REQUIRED_DATA, "missing supported_groups extension for key_share");
         return 0;
     }
 
@@ -1660,11 +1659,11 @@ static int final_key_share(SSL_CONNECTION *s, unsigned int context, int sent)
     if (!s->server
         && !sent) {
         if ((s->ext.psk_kex_mode & TLSEXT_KEX_MODE_FLAG_KE) == 0) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_NO_SUITABLE_KEY_SHARE);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_NO_MATCH, "no matching key exchange mode available");
             return 0;
         }
         if (!s->hit) {
-            SSLfatal(s, SSL_AD_MISSING_EXTENSION, SSL_R_NO_SUITABLE_KEY_SHARE);
+            SSLfatal_data(s, SSL_AD_MISSING_EXTENSION, ERR_R_NO_MATCH, "missing required psk_key_exchange_modes extension");
             return 0;
         }
     }
@@ -1713,7 +1712,7 @@ static int final_key_share(SSL_CONNECTION *s, unsigned int context, int sent)
                      * previously sent HRR - so how can this be anything other
                      * than 0?
                      */
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to construct extensions for message");
                     return 0;
                 }
                 s->hello_retry_request = SSL_HRR_PENDING;
@@ -1736,8 +1735,8 @@ static int final_key_share(SSL_CONNECTION *s, unsigned int context, int sent)
             if (!s->hit
                 || (s->ext.psk_kex_mode & TLSEXT_KEX_MODE_FLAG_KE) == 0) {
                 /* Nothing left we can do - just fail */
-                SSLfatal(s, sent ? SSL_AD_HANDSHAKE_FAILURE : SSL_AD_MISSING_EXTENSION,
-                    SSL_R_NO_SUITABLE_KEY_SHARE);
+                SSLfatal_data(s, sent ? SSL_AD_HANDSHAKE_FAILURE : SSL_AD_MISSING_EXTENSION,
+                    ERR_R_NO_MATCH, "no matching key exchange mode found");
                 return 0;
             }
 
@@ -1749,7 +1748,7 @@ static int final_key_share(SSL_CONNECTION *s, unsigned int context, int sent)
                      * previously sent HRR - so how can this be anything other
                      * than 0?
                      */
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                    SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to finalize extension construction");
                     return 0;
                 }
                 s->hello_retry_request = SSL_HRR_PENDING;
@@ -1770,7 +1769,7 @@ static int final_key_share(SSL_CONNECTION *s, unsigned int context, int sent)
          * processing).
          */
         if (!sent && !tls13_generate_handshake_secret(s, NULL, 0)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "extension construction failed");
             return 0;
         }
     }
@@ -1809,7 +1808,7 @@ int tls_psk_do_binder(SSL_CONNECTION *s, const EVP_MD *md,
 
     /* Ensure cast to size_t is safe */
     if (!ossl_assert(hashsizei > 0)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to finalize extension list in message");
         goto err;
     }
     hashsize = (size_t)hashsizei;
@@ -1855,7 +1854,7 @@ int tls_psk_do_binder(SSL_CONNECTION *s, const EVP_MD *md,
     if (mctx == NULL
         || EVP_DigestInit_ex(mctx, md, NULL) <= 0
         || EVP_DigestFinal_ex(mctx, hash, NULL) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to allocate extension context for ECH");
         goto err;
     }
 
@@ -1873,7 +1872,7 @@ int tls_psk_do_binder(SSL_CONNECTION *s, const EVP_MD *md,
     }
 
     if (EVP_DigestInit_ex(mctx, md, NULL) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to compress extensions for ECH");
         goto err;
     }
 
@@ -1891,14 +1890,14 @@ int tls_psk_do_binder(SSL_CONNECTION *s, const EVP_MD *md,
         /* handle the hashing as per ECH needs (on client) */
         if (s->ext.ech.attempted == 1 && s->ext.ech.ch_depth == 1) {
             if (ossl_ech_intbuf_fetch(s, (unsigned char **)&hdata, &hdatalen) != 1) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to allocate inner extension list");
                 goto err;
             }
         } else {
 #endif
             hdatalen = hdatalen_l = BIO_get_mem_data(s->s3.handshake_buffer, &hdata);
             if (hdatalen_l <= 0) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_HANDSHAKE_LENGTH);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_LENGTH, "inner extension length exceeds outer length");
                 goto err;
             }
 #ifndef OPENSSL_NO_ECH
@@ -1918,21 +1917,21 @@ int tls_psk_do_binder(SSL_CONNECTION *s, const EVP_MD *md,
                 || !PACKET_get_length_prefixed_3(&hashprefix, &msg)
                 || !PACKET_forward(&hashprefix, 1)
                 || !PACKET_get_length_prefixed_3(&hashprefix, &msg)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to write inner extension data");
                 goto err;
             }
             hdatalen -= PACKET_remaining(&hashprefix);
         }
 
         if (EVP_DigestUpdate(mctx, hdata, hdatalen) <= 0) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to finalize ECH payload extension");
             goto err;
         }
     }
 
     if (EVP_DigestUpdate(mctx, msgstart, binderoffset) <= 0
         || EVP_DigestFinal_ex(mctx, hash, NULL) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to reconstruct inner ClientHello extensions");
         goto err;
     }
 
@@ -1940,7 +1939,7 @@ int tls_psk_do_binder(SSL_CONNECTION *s, const EVP_MD *md,
         sctx->propq, finishedkey,
         hashsize);
     if (mackey == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to finalize reconstructed inner extensions");
         goto err;
     }
 
@@ -1957,7 +1956,7 @@ int tls_psk_do_binder(SSL_CONNECTION *s, const EVP_MD *md,
         || EVP_DigestSignUpdate(mctx, hash, hashsize) <= 0
         || EVP_DigestSignFinal(mctx, binderout, &bindersize) <= 0
         || bindersize != hashsize) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to finalize inner ClientHello");
         goto err;
     }
 
@@ -1967,7 +1966,7 @@ int tls_psk_do_binder(SSL_CONNECTION *s, const EVP_MD *md,
         /* HMAC keys can't do EVP_DigestVerify* - use CRYPTO_memcmp instead */
         ret = (CRYPTO_memcmp(binderin, binderout, hashsize) == 0);
         if (!ret)
-            SSLfatal(s, SSL_AD_DECRYPT_ERROR, SSL_R_BINDER_DOES_NOT_VERIFY);
+            SSLfatal_data(s, SSL_AD_DECRYPT_ERROR, ERR_R_VERIFICATION_FAILED, "PSK binder verification failed");
     }
 
 err:
@@ -1992,7 +1991,7 @@ static int final_early_data(SSL_CONNECTION *s, unsigned int context, int sent)
              * later realised that it shouldn't have done (e.g. inconsistent
              * ALPN)
              */
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_EARLY_DATA);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_PROTOCOL_ERROR, "post-handshake authentication extension encoding error");
             return 0;
         }
 
@@ -2057,8 +2056,8 @@ static int final_psk(SSL_CONNECTION *s, unsigned int context, int sent)
 {
     if (s->server && sent && s->clienthello != NULL
         && !s->clienthello->pre_proc_exts[TLSEXT_IDX_psk_kex_modes].present) {
-        SSLfatal(s, TLS13_AD_MISSING_EXTENSION,
-            SSL_R_MISSING_PSK_KEX_MODES_EXTENSION);
+        SSLfatal_data(s, TLS13_AD_MISSING_EXTENSION,
+            ERR_R_MISSING_REQUIRED_DATA, "missing key_share extension");
         return 0;
     }
 
@@ -2120,7 +2119,7 @@ static EXT_RETURN tls_construct_compress_certificate(SSL_CONNECTION *sc, WPACKET
     sc->ext.compress_certificate_sent = 1;
     return EXT_RETURN_SENT;
 err:
-    SSLfatal(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+    SSLfatal_data(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to initialize ECH extension parsing");
     return EXT_RETURN_FAIL;
 #else
     return EXT_RETURN_NOT_SENT;
@@ -2174,7 +2173,7 @@ int tls_parse_compress_certificate(SSL_CONNECTION *sc, PACKET *pkt, unsigned int
 
     if (!PACKET_as_length_prefixed_1(pkt, &supported_comp_algs)
         || PACKET_remaining(&supported_comp_algs) == 0) {
-        SSLfatal(sc, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(sc, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "failed to parse outer ClientHello extensions");
         return 0;
     }
 
@@ -2192,7 +2191,7 @@ int tls_parse_compress_certificate(SSL_CONNECTION *sc, PACKET *pkt, unsigned int
         }
     }
     if (PACKET_remaining(&supported_comp_algs) != 0) {
-        SSLfatal(sc, SSL_AD_DECODE_ERROR, SSL_R_BAD_EXTENSION);
+        SSLfatal_data(sc, SSL_AD_DECODE_ERROR, ERR_R_INVALID_FORMAT, "failed to decompress outer ClientHello extensions");
         return 0;
     }
 #endif

@@ -4039,7 +4039,7 @@ long ssl3_ctrl(SSL *s, int cmd, long larg, void *parg)
                 break;
             len = strlen((char *)parg);
             if (len == 0 || len > TLSEXT_MAXLEN_host_name) {
-                ERR_raise(ERR_LIB_SSL, SSL_R_TLS_EXT_INVALID_SERVERNAME);
+                ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
                 return 0;
             }
             if ((sc->ext.hostname = OPENSSL_strdup((char *)parg)) == NULL) {
@@ -4047,7 +4047,7 @@ long ssl3_ctrl(SSL *s, int cmd, long larg, void *parg)
                 return 0;
             }
         } else {
-            ERR_raise(ERR_LIB_SSL, SSL_R_TLS_EXT_INVALID_SERVERNAME_TYPE);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_FORMAT);
             return 0;
         }
         break;
@@ -4468,7 +4468,7 @@ long ssl3_ctx_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg)
         if (keys == NULL)
             return tick_keylen;
         if (larg != tick_keylen) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_INVALID_TICKET_KEYS_LENGTH);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
             return 0;
         }
         if (cmd == SSL_CTRL_SET_TLSEXT_TICKET_KEYS) {
@@ -4520,7 +4520,7 @@ long ssl3_ctx_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg)
         if (parg == NULL)
             break;
         if (strlen((const char *)parg) > 255 || strlen((const char *)parg) < 1) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_INVALID_SRP_USERNAME);
+            ERR_raise(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT);
             return 0;
         }
         if ((ctx->srp_ctx.login = OPENSSL_strdup((char *)parg)) == NULL) {
@@ -5392,7 +5392,7 @@ EVP_PKEY *ssl_generate_pkey_group(SSL_CONNECTION *s, uint16_t id)
     EVP_PKEY *pkey = NULL;
 
     if (ginf == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "key exchange group not found in group table");
         goto err;
     }
 
@@ -5400,19 +5400,19 @@ EVP_PKEY *ssl_generate_pkey_group(SSL_CONNECTION *s, uint16_t id)
         sctx->propq);
 
     if (pctx == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "failed to create EVP_PKEY_CTX for key exchange keygen");
         goto err;
     }
     if (EVP_PKEY_keygen_init(pctx) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "EVP_PKEY_keygen_init failed for key exchange");
         goto err;
     }
     if (EVP_PKEY_CTX_set_group_name(pctx, ginf->realname) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "failed to set group name for key exchange keygen");
         goto err;
     }
     if (EVP_PKEY_keygen(pctx, &pkey) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "EVP_PKEY_keygen failed for key exchange");
         EVP_PKEY_free(pkey);
         pkey = NULL;
     }
@@ -5443,7 +5443,7 @@ EVP_PKEY *ssl_generate_param_group(SSL_CONNECTION *s, uint16_t id)
     if (EVP_PKEY_paramgen_init(pctx) <= 0)
         goto err;
     if (EVP_PKEY_CTX_set_group_name(pctx, ginf->realname) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "failed to set group name for paramgen");
         goto err;
     }
     if (EVP_PKEY_paramgen(pctx, &pkey) <= 0) {
@@ -5492,7 +5492,7 @@ int ssl_derive(SSL_CONNECTION *s, EVP_PKEY *privkey, EVP_PKEY *pubkey, int gense
     SSL_CTX *sctx = SSL_CONNECTION_GET_CTX(s);
 
     if (privkey == NULL || pubkey == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "NULL private or public key in ssl_derive");
         return 0;
     }
 
@@ -5501,7 +5501,7 @@ int ssl_derive(SSL_CONNECTION *s, EVP_PKEY *privkey, EVP_PKEY *pubkey, int gense
     if (EVP_PKEY_derive_init(pctx) <= 0
         || EVP_PKEY_derive_set_peer(pctx, pubkey) <= 0
         || EVP_PKEY_derive(pctx, NULL, &pmslen) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to init ECDH derivation or determine premaster length");
         goto err;
     }
 
@@ -5510,7 +5510,7 @@ int ssl_derive(SSL_CONNECTION *s, EVP_PKEY *privkey, EVP_PKEY *pubkey, int gense
 
     pms = OPENSSL_malloc(pmslen);
     if (pms == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB, "failed to allocate premaster secret");
         goto err;
     }
 
@@ -5518,7 +5518,7 @@ int ssl_derive(SSL_CONNECTION *s, EVP_PKEY *privkey, EVP_PKEY *pubkey, int gense
         /*
          * the public key was probably a weak key
          */
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_KEY_SHARE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_KEY, "peer public key is weak and caused ECDH derivation failure");
         goto err;
     }
 
@@ -5551,7 +5551,7 @@ int ssl_decapsulate(SSL_CONNECTION *s, EVP_PKEY *privkey,
     SSL_CTX *sctx = SSL_CONNECTION_GET_CTX(s);
 
     if (privkey == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "NULL private key in ssl_decapsulate");
         return 0;
     }
 
@@ -5559,18 +5559,18 @@ int ssl_decapsulate(SSL_CONNECTION *s, EVP_PKEY *privkey,
 
     if (EVP_PKEY_decapsulate_init(pctx, NULL) <= 0
         || EVP_PKEY_decapsulate(pctx, NULL, &pmslen, ct, ctlen) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to init KEM decapsulation or determine lengths");
         goto err;
     }
 
     pms = OPENSSL_malloc(pmslen);
     if (pms == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB, "failed to allocate buffer for KEM decapsulation");
         goto err;
     }
 
     if (EVP_PKEY_decapsulate(pctx, pms, &pmslen, ct, ctlen) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "KEM decapsulation failed");
         goto err;
     }
 
@@ -5602,7 +5602,7 @@ int ssl_encapsulate(SSL_CONNECTION *s, EVP_PKEY *pubkey,
     SSL_CTX *sctx = SSL_CONNECTION_GET_CTX(s);
 
     if (pubkey == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "NULL public key in ssl_encapsulate");
         return 0;
     }
 
@@ -5611,19 +5611,19 @@ int ssl_encapsulate(SSL_CONNECTION *s, EVP_PKEY *pubkey,
     if (EVP_PKEY_encapsulate_init(pctx, NULL) <= 0
         || EVP_PKEY_encapsulate(pctx, NULL, &ctlen, NULL, &pmslen) <= 0
         || pmslen == 0 || ctlen == 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to init KEM encapsulation or zero length returned");
         goto err;
     }
 
     pms = OPENSSL_malloc(pmslen);
     ct = OPENSSL_malloc(ctlen);
     if (pms == NULL || ct == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB, "failed to allocate buffers for KEM encapsulation");
         goto err;
     }
 
     if (EVP_PKEY_encapsulate(pctx, ct, &ctlen, pms, &pmslen) <= 0) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_KEY_SHARE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_KEY, "KEM encapsulation failed, likely weak or invalid key");
         goto err;
     }
 

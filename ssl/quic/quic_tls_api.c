@@ -117,7 +117,7 @@ static int tls_callbacks_from_dispatch(OSSL_QUIC_TLS_CALLBACKS *qtcb,
         || qtcb->yield_secret_cb == NULL
         || qtcb->got_transport_params_cb == NULL
         || qtcb->alert_cb == NULL) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_MISSING_QUIC_TLS_FUNCTIONS);
+        ERR_raise(ERR_LIB_SSL, ERR_R_MISSING_REQUIRED_DATA);
         return 0;
     }
 

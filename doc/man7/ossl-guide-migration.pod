@@ -38,6 +38,24 @@ ASN1_BIT_STRING_set() does, validates the function arguments and sets
 unused bits after setting the BIT STRING value.
 
 =head1 OPENSSL 4.0
+=head3 Deprecation of library-specific error reason codes
+
+Library-specific error reason codes (such as B<SSL_R_*>, B<EVP_R_*>, etc.)
+are deprecated. New code should use the machine-readable B<ERR_R_*> error
+codes instead, with human-readable detail provided via the format string
+argument to L<ERR_raise_data(3)> or "the SSLfatal_data() macro".
+
+For example, instead of:
+
+ ERR_raise(ERR_LIB_SSL, SSL_R_BAD_PSK_IDENTITY);
+
+use:
+
+ ERR_raise_data(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "PSK identity is empty, violates RFC 8446");
+
+See L<ERR_R_XXX(7)> for the complete list of machine-readable error codes.
+
 
 =head2 Main Changes from OpenSSL 3.6
 

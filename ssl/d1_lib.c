@@ -370,7 +370,7 @@ int dtls1_check_timeout_num(SSL_CONNECTION *s)
 
     if (s->d1->timeout_num_alerts > DTLS1_TMO_ALERT_COUNT) {
         /* fail the connection, enough alerts have been sent */
-        SSLfatal(s, SSL_AD_NO_ALERT, SSL_R_READ_TIMEOUT_EXPIRED);
+        SSLfatal_data(s, SSL_AD_NO_ALERT, ERR_R_TIMEOUT, "DTLS handshake timed out: too many retransmissions");
         return -1;
     }
 
@@ -436,7 +436,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
     wbio = SSL_get_wbio(ssl);
 
     if (!rbio || !wbio) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_BIO_NOT_SET);
+        ERR_raise(ERR_LIB_SSL, ERR_R_NOT_INITIALIZED);
         return -1;
     }
 
@@ -448,7 +448,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
      * SSL_accept)
      */
     if ((s->version & 0xff00) != (DTLS1_VERSION & 0xff00)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_UNSUPPORTED_SSL_VERSION);
+        ERR_raise(ERR_LIB_SSL, ERR_R_UNSUPPORTED);
         return -1;
     }
 
@@ -492,7 +492,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
 
         /* this packet contained a partial record, dump it */
         if (n < DTLS1_RT_HEADER_LENGTH) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_RECORD_TOO_SMALL);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
             goto end;
         }
 
@@ -500,7 +500,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
         if (!PACKET_get_1(&pkt, &rectype)
             || !PACKET_get_1(&pkt, &versmajor)
             || !PACKET_get_1(&pkt, &versminor)) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_LENGTH_MISMATCH);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
             goto end;
         }
 
@@ -509,7 +509,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
                 DTLS1_RT_HEADER_LENGTH, ssl, s->msg_callback_arg);
 
         if (rectype != SSL3_RT_HANDSHAKE) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_UNEXPECTED_MESSAGE);
+            ERR_raise(ERR_LIB_SSL, ERR_R_WRONG_STATE);
             goto end;
         }
 
@@ -518,14 +518,14 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
          * the same.
          */
         if (versmajor != DTLS1_VERSION_MAJOR) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_BAD_PROTOCOL_VERSION_NUMBER);
+            ERR_raise(ERR_LIB_SSL, ERR_R_PROTOCOL_ERROR);
             goto end;
         }
 
         /* Save the sequence number: 64 bits, with top 2 bytes = epoch */
         if (!PACKET_copy_bytes(&pkt, seq, SEQ_NUM_SIZE)
             || !PACKET_get_length_prefixed_2(&pkt, &msgpkt)) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_LENGTH_MISMATCH);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
             goto end;
         }
         /*
@@ -535,7 +535,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
 
         /* This is an initial ClientHello so the epoch has to be 0 */
         if (seq[0] != 0 || seq[1] != 0) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_UNEXPECTED_MESSAGE);
+            ERR_raise(ERR_LIB_SSL, ERR_R_WRONG_STATE);
             goto end;
         }
 
@@ -550,18 +550,18 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
             || !PACKET_get_net_3_len(&msgpkt, &fraglen)
             || !PACKET_get_sub_packet(&msgpkt, &msgpayload, fraglen)
             || PACKET_remaining(&msgpkt) != 0) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_LENGTH_MISMATCH);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
             goto end;
         }
 
         if (msgtype != SSL3_MT_CLIENT_HELLO) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_UNEXPECTED_MESSAGE);
+            ERR_raise(ERR_LIB_SSL, ERR_R_WRONG_STATE);
             goto end;
         }
 
         /* Message sequence number can only be 0 or 1 */
         if (msgseq > 1) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_INVALID_SEQUENCE_NUMBER);
+            ERR_raise(ERR_LIB_SSL, ERR_R_PROTOCOL_ERROR);
             goto end;
         }
 
@@ -574,7 +574,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
          */
         if (fragoff != 0 || fraglen > msglen) {
             /* Non initial ClientHello fragment (or bad fragment) */
-            ERR_raise(ERR_LIB_SSL, SSL_R_FRAGMENTED_CLIENT_HELLO);
+            ERR_raise(ERR_LIB_SSL, ERR_R_PROTOCOL_ERROR);
             goto end;
         }
 
@@ -584,7 +584,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
                 s->msg_callback_arg);
 
         if (!PACKET_get_net_2(&msgpayload, &clientvers)) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_LENGTH_MISMATCH);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
             goto end;
         }
 
@@ -592,7 +592,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
          * Verify client version is supported
          */
         if (DTLS_VERSION_LT(clientvers, (unsigned int)ssl->method->version) && ssl->method->version != DTLS_ANY_VERSION) {
-            ERR_raise(ERR_LIB_SSL, SSL_R_WRONG_VERSION_NUMBER);
+            ERR_raise(ERR_LIB_SSL, ERR_R_MISMATCH);
             goto end;
         }
 
@@ -603,7 +603,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
              * Could be malformed or the cookie does not fit within the initial
              * ClientHello fragment. Either way we can't handle it.
              */
-            ERR_raise(ERR_LIB_SSL, SSL_R_LENGTH_MISMATCH);
+            ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
             goto end;
         }
 
@@ -618,7 +618,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
              * We have a cookie, so lets check it.
              */
             if (ssl->ctx->app_verify_cookie_cb == NULL) {
-                ERR_raise(ERR_LIB_SSL, SSL_R_NO_VERIFY_COOKIE_CALLBACK);
+                ERR_raise(ERR_LIB_SSL, ERR_R_MISSING_REQUIRED_DATA);
                 /* This is fatal */
                 ret = -1;
                 goto end;
@@ -650,7 +650,7 @@ int DTLSv1_listen(SSL *ssl, BIO_ADDR *client)
 
             /* Generate the cookie */
             if (ssl->ctx->app_gen_cookie_cb == NULL || ssl->ctx->app_gen_cookie_cb(ssl, cookie, &cookielen) == 0 || cookielen > 255) {
-                ERR_raise(ERR_LIB_SSL, SSL_R_COOKIE_GEN_CALLBACK_FAILURE);
+                ERR_raise(ERR_LIB_SSL, ERR_R_CALLBACK_FAILED);
                 /* This is fatal */
                 ret = -1;
                 goto end;

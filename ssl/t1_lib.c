@@ -1119,7 +1119,7 @@ int tls1_set_groups(uint16_t **grpext, size_t *grpextlen,
     unsigned long dup_list_dhgrp = 0;
 
     if (ngroups == 0) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_BAD_LENGTH);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
         return 0;
     }
     if ((glist = OPENSSL_malloc_array(ngroups, sizeof(*glist))) == NULL)
@@ -1306,7 +1306,7 @@ static int gid_cb(const char *elem, int len, void *arg)
 
     /* Sanity checks */
     if (garg == NULL || elem == NULL || len <= 0) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_UNSUPPORTED_CONFIG_VALUE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_UNSUPPORTED);
         return 0;
     }
 
@@ -1672,7 +1672,7 @@ static int tuple_cb(const char *tuple, int len, void *arg)
 
     /* Sanity checks */
     if (garg == NULL || tuple == NULL || len <= 0) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_UNSUPPORTED_CONFIG_VALUE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_UNSUPPORTED);
         return 0;
     }
 
@@ -2866,7 +2866,7 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
     if (SSL_CONNECTION_IS_TLS13(s)) {
         /* Disallow DSA for TLS 1.3 */
         if (pkeyid == EVP_PKEY_DSA) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_WRONG_SIGNATURE_TYPE);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
             return 0;
         }
         /* Only allow PSS for TLS 1.3 */
@@ -2877,7 +2877,7 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
     /* Is this code point available and compatible with the protocol */
     lu = tls1_lookup_sigalg(SSL_CONNECTION_GET_CTX(s), sig);
     if (lu == NULL || !tls_sigalg_compat(s, lu)) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_WRONG_SIGNATURE_TYPE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
         return 0;
     }
 
@@ -2886,7 +2886,7 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
         const SSL_CERT_LOOKUP *scl = ssl_cert_lookup_by_pkey(pkey, NULL, SSL_CONNECTION_GET_CTX(s));
 
         if (scl == NULL) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_WRONG_SIGNATURE_TYPE);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
             return 0;
         }
         pkeyid = scl->pkey_nid;
@@ -2894,7 +2894,7 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
 
     /* Should never happen */
     if (pkeyid == -1) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_WRONG_SIGNATURE_TYPE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
         return -1;
     }
 
@@ -2906,7 +2906,7 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
             && (lu->hash == NID_sha1 || lu->hash == NID_sha224))
         || (pkeyid != lu->sig
             && (lu->sig != EVP_PKEY_RSA_PSS || pkeyid != EVP_PKEY_RSA))) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_WRONG_SIGNATURE_TYPE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
         return 0;
     }
     /* Check the sigalg is consistent with the key OID */
@@ -2914,7 +2914,7 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
             (pkeyid == EVP_PKEY_RSA_PSS) ? EVP_PKEY_get_id(pkey) : pkeyid,
             &cidx, SSL_CONNECTION_GET_CTX(s))
         || lu->sig_idx != (int)cidx) {
-        SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_WRONG_SIGNATURE_TYPE);
+        SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
         return 0;
     }
 
@@ -2922,8 +2922,7 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
 
         /* Check point compression is permitted */
         if (!tls1_check_pkey_comp(s, pkey)) {
-            SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER,
-                SSL_R_ILLEGAL_POINT_COMPRESSION);
+            SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_INVALID_KEY, "invalid key in tls12 check peer sigalg");
             return 0;
         }
 
@@ -2932,28 +2931,27 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
             int curve = ssl_get_EC_curve_nid(pkey);
 
             if (lu->curve != NID_undef && curve != lu->curve) {
-                SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_WRONG_CURVE);
+                SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
                 return 0;
             }
         }
         if (!SSL_CONNECTION_IS_TLS13(s)) {
             /* Check curve matches extensions */
             if (!tls1_check_group_id(s, tls1_get_group_id(pkey), 1)) {
-                SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_WRONG_CURVE);
+                SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
                 return 0;
             }
             if (tls1_suiteb(s)) {
                 /* Check sigalg matches a permissible Suite B value */
                 if (sig != TLSEXT_SIGALG_ecdsa_secp256r1_sha256
                     && sig != TLSEXT_SIGALG_ecdsa_secp384r1_sha384) {
-                    SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
-                        SSL_R_WRONG_SIGNATURE_TYPE);
+                    SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
                     return 0;
                 }
             }
         }
     } else if (tls1_suiteb(s)) {
-        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_WRONG_SIGNATURE_TYPE);
+        SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
         return 0;
     }
 
@@ -2965,11 +2963,11 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
     }
     /* Allow fallback to SHA1 if not strict mode */
     if (i == sent_sigslen && (lu->hash != NID_sha1 || s->cert->cert_flags & SSL_CERT_FLAGS_CHECK_TLS_STRICT)) {
-        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_WRONG_SIGNATURE_TYPE);
+        SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
         return 0;
     }
     if (!tls1_lookup_md(SSL_CONNECTION_GET_CTX(s), lu, &md)) {
-        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_UNKNOWN_DIGEST);
+        SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_UNKNOWN, "unknown in tls12 check peer sigalg");
         return 0;
     }
     /*
@@ -2980,7 +2978,7 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
     sigalgstr[1] = sig & 0xff;
     secbits = sigalg_security_bits(SSL_CONNECTION_GET_CTX(s), lu);
     if (secbits == 0 || !ssl_security(s, SSL_SECOP_SIGALG_CHECK, secbits, md != NULL ? EVP_MD_get_type(md) : NID_undef, (void *)sigalgstr)) {
-        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_WRONG_SIGNATURE_TYPE);
+        SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_MISMATCH, "mismatch in tls12 check peer sigalg");
         return 0;
     }
     /* Store the sigalg the peer uses */
@@ -3119,7 +3117,7 @@ int tls1_set_server_sigalgs(SSL_CONNECTION *s)
     else
         s->s3.tmp.valid_flags = OPENSSL_calloc(s->ssl_pkey_num, sizeof(uint32_t));
     if (s->s3.tmp.valid_flags == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls1_set_server_sigalgs");
         return 0;
     }
     /*
@@ -3149,15 +3147,14 @@ int tls1_set_server_sigalgs(SSL_CONNECTION *s)
     }
 
     if (!tls1_process_sigalgs(s)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "internal error in tls1_set_server_sigalgs");
         return 0;
     }
     if (s->shared_sigalgs != NULL)
         return 1;
 
     /* Fatal error if no shared signature algorithms */
-    SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
-        SSL_R_NO_SHARED_SIGNATURE_ALGORITHMS);
+    SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_NO_MATCH, "no matching tls1 set server sigalgs");
     return 0;
 }
 
@@ -3614,7 +3611,7 @@ int tls12_copy_sigalgs(SSL_CONNECTION *s, WPACKET *pkt,
             rv = 1;
     }
     if (rv == 0)
-        ERR_raise(ERR_LIB_SSL, SSL_R_NO_SUITABLE_SIGNATURE_ALGORITHM);
+        ERR_raise(ERR_LIB_SSL, ERR_R_NO_MATCH);
     return rv;
 }
 
@@ -4614,13 +4611,13 @@ int ssl_security_cert(SSL_CONNECTION *s, SSL_CTX *ctx, X509 *x, int vfy,
         vfy = SSL_SECOP_PEER;
     if (is_ee) {
         if (!ssl_security_cert_key(s, ctx, x, SSL_SECOP_EE_KEY | vfy))
-            return SSL_R_EE_KEY_TOO_SMALL;
+            return ERR_R_SECURITY_VIOLATION;
     } else {
         if (!ssl_security_cert_key(s, ctx, x, SSL_SECOP_CA_KEY | vfy))
-            return SSL_R_CA_KEY_TOO_SMALL;
+            return ERR_R_SECURITY_VIOLATION;
     }
     if (!ssl_security_cert_sig(s, ctx, x, SSL_SECOP_CA_MD | vfy))
-        return SSL_R_CA_MD_TOO_WEAK;
+        return ERR_R_SECURITY_VIOLATION;
     return 1;
 }
 
@@ -4857,8 +4854,7 @@ int tls_choose_sigalg(SSL_CONNECTION *s, int fatalerrs)
         if (lu == NULL) {
             if (!fatalerrs)
                 return 1;
-            SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
-                SSL_R_NO_SUITABLE_SIGNATURE_ALGORITHM);
+            SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_NO_MATCH, "no matching choose sigalg");
             return 0;
         }
     } else {
@@ -4924,8 +4920,7 @@ int tls_choose_sigalg(SSL_CONNECTION *s, int fatalerrs)
                     if ((lu = tls1_get_legacy_sigalg(s, -1)) == NULL) {
                         if (!fatalerrs)
                             return 1;
-                        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
-                            SSL_R_NO_SUITABLE_SIGNATURE_ALGORITHM);
+                        SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_NO_MATCH, "no matching choose sigalg");
                         return 0;
                     } else {
                         i = 0;
@@ -4936,8 +4931,7 @@ int tls_choose_sigalg(SSL_CONNECTION *s, int fatalerrs)
                 if (i == s->shared_sigalgslen) {
                     if (!fatalerrs)
                         return 1;
-                    SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
-                        SSL_R_NO_SUITABLE_SIGNATURE_ALGORITHM);
+                    SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_NO_MATCH, "no matching choose sigalg");
                     return 0;
                 }
             } else {
@@ -4950,8 +4944,7 @@ int tls_choose_sigalg(SSL_CONNECTION *s, int fatalerrs)
                 if ((lu = tls1_get_legacy_sigalg(s, -1)) == NULL) {
                     if (!fatalerrs)
                         return 1;
-                    SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
-                        SSL_R_NO_SUITABLE_SIGNATURE_ALGORITHM);
+                    SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_NO_MATCH, "no matching choose sigalg");
                     return 0;
                 }
 
@@ -4965,8 +4958,7 @@ int tls_choose_sigalg(SSL_CONNECTION *s, int fatalerrs)
                 if (i == sent_sigslen) {
                     if (!fatalerrs)
                         return 1;
-                    SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
-                        SSL_R_WRONG_SIGNATURE_TYPE);
+                    SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_MISMATCH, "mismatch in choose sigalg");
                     return 0;
                 }
             }
@@ -4974,8 +4966,7 @@ int tls_choose_sigalg(SSL_CONNECTION *s, int fatalerrs)
             if ((lu = tls1_get_legacy_sigalg(s, -1)) == NULL) {
                 if (!fatalerrs)
                     return 1;
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR,
-                    SSL_R_NO_SUITABLE_SIGNATURE_ALGORITHM);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_NO_MATCH, "no matching choose sigalg");
                 return 0;
             }
         }
@@ -4992,7 +4983,7 @@ int SSL_CTX_set_tlsext_max_fragment_length(SSL_CTX *ctx, uint8_t mode)
 {
     if (mode != TLSEXT_max_fragment_length_DISABLED
         && !IS_MAX_FRAGMENT_LENGTH_EXT_VALID(mode)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_TLS_EXT_INVALID_MAX_FRAGMENT_LENGTH);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
         return 0;
     }
 
@@ -5010,7 +5001,7 @@ int SSL_set_tlsext_max_fragment_length(SSL *ssl, uint8_t mode)
 
     if (mode != TLSEXT_max_fragment_length_DISABLED
         && !IS_MAX_FRAGMENT_LENGTH_EXT_VALID(mode)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_TLS_EXT_INVALID_MAX_FRAGMENT_LENGTH);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
         return 0;
     }
 

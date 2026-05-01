@@ -2773,11 +2773,11 @@ static const char *tls_error_hint(void)
         return NULL; /* likely no TLS error */
 
     switch (ERR_GET_REASON(err)) {
-    case SSL_R_WRONG_VERSION_NUMBER:
+    case ERR_R_MISMATCH:
         return "The server does not support (a suitable version of) TLS";
     case SSL_R_UNKNOWN_PROTOCOL:
         return "The server does not support HTTPS";
-    case SSL_R_CERTIFICATE_VERIFY_FAILED:
+    case ERR_R_CERTIFICATE_VERIFICATION_FAILED:
         return "Cannot authenticate server via its TLS certificate, likely due to mismatch with our trusted TLS certs or missing revocation status";
     case SSL_AD_REASON_OFFSET + TLS1_AD_UNKNOWN_CA:
         return "Server did not accept our TLS certificate, likely due to mismatch with server's trust anchor or missing revocation status";
@@ -2800,7 +2800,7 @@ static BIO *http_tls_shutdown(BIO *bio)
         BIO_ssl_shutdown(bio);
         cbio = BIO_pop(bio); /* connect+HTTP BIO */
         BIO_free(bio); /* SSL BIO */
-        (void)ERR_pop_to_mark(); /* hide SSL_R_READ_BIO_NOT_SET etc. */
+        (void)ERR_pop_to_mark(); /* hide ERR_R_NOT_INITIALIZED etc. */
         bio = cbio;
     }
     return bio;

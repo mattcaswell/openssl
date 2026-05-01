@@ -617,7 +617,7 @@ static size_t build_request_set(SSL *ssl)
                 new_stream = SSL_new_stream(ssl, 0);
                 if (new_stream == NULL
                     && (error = ERR_get_error()) != 0
-                    && ERR_GET_REASON(error) == SSL_R_STREAM_COUNT_LIMITED) {
+                    && ERR_GET_REASON(error) == ERR_R_INSUFFICIENT_RESOURCES) {
                     /*
                      * Kick the SSL state machine in the hopes that
                      * the server has a MAX_STREAM frame for us to process

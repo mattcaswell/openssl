@@ -41,7 +41,7 @@ int SSL_set1_echstore(SSL *ssl, OSSL_ECHSTORE *es)
     if (es == NULL)
         return 1;
     if ((s->ext.ech.es = ossl_echstore_dup(es)) == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to duplicate ECH configuration");
         return 0;
     }
     /*

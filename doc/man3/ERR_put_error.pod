@@ -81,7 +81,7 @@ OpenSSL's libraries.  OpenSSL reason codes normally consist of textual error
 descriptions. For example, the function ssl3_read_bytes() reports a
 "handshake failure" as follows:
 
- ERR_raise(ERR_LIB_SSL, SSL_R_SSL_HANDSHAKE_FAILURE);
+ ERR_raise(ERR_LIB_SSL, ERR_R_HANDSHAKE_FAILURE);
 
 There are two exceptions:
 
@@ -96,13 +96,32 @@ be L<errno(3)>.
  ERR_raise(ERR_LIB_SYS, errno);
 
 =item B<ERR_R_XXX>
+=item B<ERR_R_XXX>
 
 This set of error codes is considered global, and may be used in combination
-with any sub-library code.
+with any sub-library code. These are the stable, documented error codes that
+applications can rely on for programmatic error handling. Human-readable
+detail should be provided via the B<fmt> argument to ERR_raise_data() rather
+than encoded in the reason code itself.
 
- ERR_raise(ERR_LIB_RSA, ERR_R_PASSED_INVALID_ARGUMENT);
+For example, instead of:
+
+ ERR_raise(ERR_LIB_SSL, SSL_R_BAD_PSK_IDENTITY);
+
+use the equivalent machine-readable code with a descriptive format string:
+
+ ERR_raise_data(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "PSK identity is empty, violates RFC 8446");
+
+The complete list of machine-readable error codes can be found in
+L<ERR_R_XXX(7)>.
 
 =back
+
+The library-specific B<*_R_*> reason codes (such as B<SSL_R_*>, B<EVP_R_*>,
+etc.) are deprecated.  They are retained for backward compatibility but new
+code should use the B<ERR_R_XXX> codes instead.  The library-specific codes
+may change between releases as OpenSSL's internals evolve.
 
 =head3 Other pieces of software
 

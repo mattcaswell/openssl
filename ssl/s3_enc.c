@@ -27,7 +27,7 @@ int ssl3_init_finished_mac(SSL_CONNECTION *s)
     BIO *buf = BIO_new(BIO_s_mem());
 
     if (buf == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_BIO_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_BIO_LIB, "failed to create handshake buffer BIO");
         return 0;
     }
     ssl3_free_digest_list(s);
@@ -56,18 +56,18 @@ int ssl3_finish_mac(SSL_CONNECTION *s, const unsigned char *buf, size_t len)
     if (s->s3.handshake_dgst == NULL) {
         /* Note: this writes to a memory BIO so a failure is a fatal error */
         if (len > INT_MAX) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_OVERFLOW_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_OVERFLOW, "handshake data too long for BIO write");
             return 0;
         }
         ret = BIO_write(s->s3.handshake_buffer, (void *)buf, (int)len);
         if (ret <= 0 || ret != (int)len) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to write handshake data to buffer");
             return 0;
         }
     } else {
         ret = EVP_DigestUpdate(s->s3.handshake_dgst, buf, len);
         if (!ret) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to update handshake digest");
             return 0;
         }
     }
@@ -83,25 +83,24 @@ int ssl3_digest_cached_records(SSL_CONNECTION *s, int keep)
     if (s->s3.handshake_dgst == NULL) {
         hdatalen = BIO_get_mem_data(s->s3.handshake_buffer, &hdata);
         if (hdatalen <= 0) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_HANDSHAKE_LENGTH);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_LENGTH, "handshake buffer is empty");
             return 0;
         }
 
         s->s3.handshake_dgst = EVP_MD_CTX_new();
         if (s->s3.handshake_dgst == NULL) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB, "failed to allocate handshake digest context");
             return 0;
         }
 
         md = ssl_handshake_md(s);
         if (md == NULL) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR,
-                SSL_R_NO_SUITABLE_DIGEST_ALGORITHM);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_NO_MATCH, "no matching digest cached records");
             return 0;
         }
         if (!EVP_DigestInit_ex(s->s3.handshake_dgst, md, NULL)
             || !EVP_DigestUpdate(s->s3.handshake_dgst, hdata, hdatalen)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to initialize or update handshake digest with cached records");
             return 0;
         }
     }

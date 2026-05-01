@@ -179,11 +179,11 @@ void ossl_statem_fatal(SSL_CONNECTION *s, int al, int reason,
  * a fatal error state. We verify that we are, and set it if not (this would
  * indicate a bug).
  */
-#define check_fatal(s)                                               \
-    do {                                                             \
-        if (!ossl_assert((s)->statem.in_init                         \
-                && (s)->statem.state == MSG_FLOW_ERROR))             \
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_MISSING_FATAL); \
+#define check_fatal(s)                                                                                                            \
+    do {                                                                                                                          \
+        if (!ossl_assert((s)->statem.in_init                                                                                      \
+                && (s)->statem.state == MSG_FLOW_ERROR))                                                                          \
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_MISSING_REQUIRED_DATA, "state machine not in error state as expected"); \
     } while (0)
 
 /*
@@ -416,28 +416,28 @@ static int state_machine(SSL_CONNECTION *s, int server)
 
         if (SSL_CONNECTION_IS_DTLS(s)) {
             if ((s->version & 0xff00) != (DTLS1_VERSION & 0xff00) && (server || (s->version & 0xff00) != (DTLS1_BAD_VER & 0xff00))) {
-                SSLfatal(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR, "DTLS version incompatible with expected version range");
                 goto end;
             }
         } else {
             if ((s->version >> 8) != SSL3_VERSION_MAJOR) {
-                SSLfatal(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR, "SSL version major number mismatch");
                 goto end;
             }
         }
 
         if (!ssl_security(s, SSL_SECOP_VERSION, 0, s->version, NULL)) {
-            SSLfatal(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR, "SSL version not permitted by security callback");
             goto end;
         }
 
         if (s->init_buf == NULL) {
             if ((buf = BUF_MEM_new()) == NULL) {
-                SSLfatal(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR, "failed to allocate init buffer");
                 goto end;
             }
             if (!BUF_MEM_grow(buf, SSL3_RT_MAX_PLAIN_LENGTH)) {
-                SSLfatal(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR, "failed to grow init buffer to maximum plaintext length");
                 goto end;
             }
             s->init_buf = buf;
@@ -459,7 +459,7 @@ static int state_machine(SSL_CONNECTION *s, int server)
         if (!SSL_CONNECTION_IS_DTLS(s) || !BIO_dgram_is_sctp(SSL_get_wbio(ssl)))
 #endif
             if (!ssl_init_wbio_buffer(s)) {
-                SSLfatal(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_NO_ALERT, ERR_R_INTERNAL_ERROR, "failed to initialize write BIO buffer");
                 goto end;
             }
 
@@ -634,8 +634,8 @@ static SUB_STATE_RETURN read_state_machine(SSL_CONNECTION *s)
                 return SUB_STATE_ERROR;
 
             if (s->s3.tmp.message_size > max_message_size(s)) {
-                SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER,
-                    SSL_R_EXCESSIVE_MESSAGE_SIZE);
+                SSLfatal_data(s, SSL_AD_ILLEGAL_PARAMETER,
+                    ERR_R_INVALID_LENGTH, "handshake message exceeds maximum allowed size");
                 return SUB_STATE_ERROR;
             }
 
@@ -667,11 +667,11 @@ static SUB_STATE_RETURN read_state_machine(SSL_CONNECTION *s)
             headerlen = (char *)s->init_msg - s->init_buf->data;
             if (!PACKET_buf_init(&pkt, (unsigned char *)s->init_buf->data,
                     len + headerlen)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to initialize packet from message buffer");
                 return SUB_STATE_ERROR;
             }
             if (!PACKET_forward(&pkt, headerlen)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to skip message header in packet");
                 return SUB_STATE_ERROR;
             }
 
@@ -728,7 +728,7 @@ static SUB_STATE_RETURN read_state_machine(SSL_CONNECTION *s)
 
         default:
             /* Shouldn't happen */
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to initialize WPACKET or set handshake header");
             return SUB_STATE_ERROR;
         }
     }
@@ -882,7 +882,7 @@ static SUB_STATE_RETURN write_state_machine(SSL_CONNECTION *s)
             if (!WPACKET_init(&pkt, s->init_buf)
                 || !ssl_set_handshake_header(s, &pkt, mt)) {
                 WPACKET_cleanup(&pkt);
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "unexpected read state in state machine");
                 return SUB_STATE_ERROR;
             }
             if (confunc != NULL) {
@@ -907,7 +907,7 @@ static SUB_STATE_RETURN write_state_machine(SSL_CONNECTION *s)
             if (!ssl_close_construct_packet(s, &pkt, mt)
                 || !WPACKET_finish(&pkt)) {
                 WPACKET_cleanup(&pkt);
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to close or finish handshake message packet");
                 return SUB_STATE_ERROR;
             }
 
@@ -948,7 +948,7 @@ static SUB_STATE_RETURN write_state_machine(SSL_CONNECTION *s)
             break;
 
         default:
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "unexpected write state in state machine");
             return SUB_STATE_ERROR;
         }
     }

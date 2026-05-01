@@ -96,7 +96,7 @@ int ssl_set_tmp_ecdh_groups(uint16_t **pext, size_t *pextlen,
     int nid;
 
     if (group == NULL) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_MISSING_PARAMETERS);
+        ERR_raise(ERR_LIB_SSL, ERR_R_MISSING_REQUIRED_DATA);
         return 0;
     }
     nid = EC_GROUP_get_curve_name(group);

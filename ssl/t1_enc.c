@@ -38,7 +38,7 @@ static int tls1_PRF(SSL_CONNECTION *s,
     if (md == NULL) {
         /* Should never happen */
         if (fatal)
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "no PRF digest available for key derivation");
         else
             ERR_raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR);
         return 0;
@@ -81,7 +81,7 @@ static int tls1_PRF(SSL_CONNECTION *s,
 err:
 #endif
     if (fatal)
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "TLS PRF key derivation failed");
     else
         ERR_raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR);
     EVP_KDF_CTX_free(kctx);
@@ -147,7 +147,7 @@ int tls1_change_cipher_state(SSL_CONNECTION *s, int which)
     j = cl;
     iivlen = tls_iv_length_within_key_block(c);
     if (iivlen < 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "invalid IV length in key block");
         goto err;
     }
     k = iivlen;
@@ -169,7 +169,7 @@ int tls1_change_cipher_state(SSL_CONNECTION *s, int which)
     }
 
     if (n > s->s3.tmp.key_block_length) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "key block too small for cipher parameters");
         goto err;
     }
 
@@ -287,7 +287,7 @@ int tls1_setup_key_block(SSL_CONNECTION *s)
     s->s3.tmp.new_mac_secret_size = mac_secret_size;
     ivlen = tls_iv_length_within_key_block(c);
     if (ivlen < 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "invalid IV length in key block generation");
         return 0;
     }
     num = mac_secret_size + EVP_CIPHER_get_key_length(c) + ivlen;
@@ -296,7 +296,7 @@ int tls1_setup_key_block(SSL_CONNECTION *s)
     ssl3_cleanup_key_block(s);
 
     if ((p = OPENSSL_malloc(num)) == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB, "failed to allocate key block memory");
         goto err;
     }
 
@@ -518,7 +518,7 @@ int tls1_export_keying_material(SSL_CONNECTION *s, unsigned char *out,
 
     goto ret;
 err1:
-    ERR_raise(ERR_LIB_SSL, SSL_R_TLS_ILLEGAL_EXPORTER_LABEL);
+    ERR_raise(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT);
 ret:
     OPENSSL_clear_free(val, vallen);
     return rv;

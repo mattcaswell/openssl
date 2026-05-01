@@ -55,7 +55,7 @@ static int ssl_do_config(SSL *s, SSL_CTX *ctx, const char *name, int system)
         name = "system_default";
 
     if (name == NULL) {
-        ERR_raise_data(ERR_LIB_SSL, SSL_R_INVALID_CONFIGURATION_NAME,
+        ERR_raise_data(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT,
             "name not specified (name == NULL)");
         goto err;
     }
@@ -64,7 +64,7 @@ static int ssl_do_config(SSL *s, SSL_CTX *ctx, const char *name, int system)
     imod = ssl_do_lookup_module(libctx);
     if (!conf_ssl_name_find(imod, name, &idx)) {
         if (!system)
-            ERR_raise_data(ERR_LIB_SSL, SSL_R_INVALID_CONFIGURATION_NAME,
+            ERR_raise_data(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT,
                 "name=%s", name);
         goto err;
     }

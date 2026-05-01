@@ -1111,6 +1111,11 @@ DEPEND[html/man3/ERR_new.html]=man3/ERR_new.pod
 GENERATE[html/man3/ERR_new.html]=man3/ERR_new.pod
 DEPEND[man/man3/ERR_new.3]=man3/ERR_new.pod
 GENERATE[man/man3/ERR_new.3]=man3/ERR_new.pod
+
+DEPEND[html/man7/ERR_R_XXX.html]=man7/ERR_R_XXX.pod
+GENERATE[html/man7/ERR_R_XXX.html]=man7/ERR_R_XXX.pod
+DEPEND[man/man7/ERR_R_XXX.7]=man7/ERR_R_XXX.pod
+GENERATE[man/man7/ERR_R_XXX.7]=man7/ERR_R_XXX.pod
 DEPEND[html/man3/ERR_print_errors.html]=man3/ERR_print_errors.pod
 GENERATE[html/man3/ERR_print_errors.html]=man3/ERR_print_errors.pod
 DEPEND[man/man3/ERR_print_errors.3]=man3/ERR_print_errors.pod
@@ -4002,6 +4007,7 @@ man/man3/ERR_new.3 \
 man/man3/ERR_print_errors.3 \
 man/man3/ERR_put_error.3 \
 man/man3/ERR_set_mark.3 \
+man/man7/ERR_R_XXX.7 \
 man/man3/EVP_ASYM_CIPHER_free.3 \
 man/man3/EVP_BytesToKey.3 \
 man/man3/EVP_CIPHER_CTX_get_app_data.3 \

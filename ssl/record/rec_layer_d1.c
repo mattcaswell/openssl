@@ -91,7 +91,7 @@ static int dtls_buffer_record(SSL_CONNECTION *s, TLS_RECORD *rec)
     if (rdata == NULL || item == NULL) {
         OPENSSL_free(rdata);
         pitem_free(item);
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to allocate DTLS buffered record data");
         return -1;
     }
 
@@ -105,7 +105,7 @@ static int dtls_buffer_record(SSL_CONNECTION *s, TLS_RECORD *rec)
     if (rdata->data == NULL) {
         OPENSSL_free(rdata);
         pitem_free(item);
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CRYPTO_LIB, "failed to duplicate DTLS record data for buffering");
         return -1;
     }
     /*
@@ -208,7 +208,7 @@ int dtls1_read_bytes(SSL *s, uint8_t type, uint8_t *recvd_type,
         return -1;
 
     if ((type && (type != SSL3_RT_APPLICATION_DATA) && (type != SSL3_RT_HANDSHAKE)) || (peek && (type != SSL3_RT_APPLICATION_DATA))) {
-        SSLfatal(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "invalid record type or peek mode for DTLS read");
         return -1;
     }
 
@@ -321,8 +321,7 @@ start:
          */
         if (SSL_in_init(s) && (type == SSL3_RT_APPLICATION_DATA)
             && (SSL_IS_FIRST_HANDSHAKE(sc))) {
-            SSLfatal(sc, SSL_AD_UNEXPECTED_MESSAGE,
-                SSL_R_APP_DATA_IN_HANDSHAKE);
+            SSLfatal_data(sc, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "wrong state in read bytes");
             return -1;
         }
 
@@ -383,7 +382,7 @@ start:
             || !PACKET_get_1(&alert, &alert_level)
             || !PACKET_get_1(&alert, &alert_descr)
             || PACKET_remaining(&alert) != 0) {
-            SSLfatal(sc, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_INVALID_ALERT);
+            SSLfatal_data(sc, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_PASSED_INVALID_ARGUMENT, "failed to parse DTLS alert record");
             return -1;
         }
 
@@ -408,8 +407,7 @@ start:
 
             sc->rlayer.alert_count++;
             if (sc->rlayer.alert_count == MAX_WARN_ALERT_COUNT) {
-                SSLfatal(sc, SSL_AD_UNEXPECTED_MESSAGE,
-                    SSL_R_TOO_MANY_WARN_ALERTS);
+                SSLfatal_data(sc, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_OVERFLOW, "overflow in read bytes");
                 return -1;
             }
 
@@ -439,7 +437,7 @@ start:
                  * the future we might have a renegotiation where we don't care
                  * if the peer refused it where we carry on.
                  */
-                SSLfatal(sc, SSL_AD_HANDSHAKE_FAILURE, SSL_R_NO_RENEGOTIATION);
+                SSLfatal_data(sc, SSL_AD_HANDSHAKE_FAILURE, ERR_R_UNSUPPORTED, "peer refused DTLS renegotiation");
                 return -1;
             }
         } else if (alert_level == SSL3_AL_FATAL) {
@@ -454,7 +452,7 @@ start:
             SSL_CTX_remove_session(sc->session_ctx, sc->session);
             return 0;
         } else {
-            SSLfatal(sc, SSL_AD_ILLEGAL_PARAMETER, SSL_R_UNKNOWN_ALERT_TYPE);
+            SSLfatal_data(sc, SSL_AD_ILLEGAL_PARAMETER, ERR_R_UNKNOWN, "unknown DTLS alert type received");
             return -1;
         }
 
@@ -537,7 +535,7 @@ start:
          * finished
          */
         if (!ossl_assert(SSL_is_init_finished(s))) {
-            SSLfatal(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "handshake not finished when expecting app data");
             return -1;
         }
 
@@ -573,7 +571,7 @@ start:
 
     switch (rr->type) {
     default:
-        SSLfatal(sc, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_UNEXPECTED_RECORD);
+        SSLfatal_data(sc, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "unexpected DTLS record type received");
         return -1;
     case SSL3_RT_CHANGE_CIPHER_SPEC:
     case SSL3_RT_ALERT:
@@ -583,7 +581,7 @@ start:
          * SSL3_RT_HANDSHAKE when ossl_statem_get_in_handshake(s) is true, but
          * that should not happen when type != rr->type
          */
-        SSLfatal(sc, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(sc, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_INTERNAL_ERROR, "unexpected handshake data when expecting app data");
         return -1;
     case SSL3_RT_APPLICATION_DATA:
         /*
@@ -597,7 +595,7 @@ start:
             sc->s3.in_read_app_data = 2;
             return -1;
         } else {
-            SSLfatal(sc, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_UNEXPECTED_RECORD);
+            SSLfatal_data(sc, SSL_AD_UNEXPECTED_MESSAGE, ERR_R_WRONG_STATE, "unexpected app data when expecting handshake");
             return -1;
         }
     }
@@ -614,7 +612,7 @@ int dtls1_write_bytes(SSL_CONNECTION *s, uint8_t type, const void *buf,
     int i;
 
     if (!ossl_assert(len <= SSL3_RT_MAX_PLAIN_LENGTH)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "DTLS plaintext exceeds maximum length");
         return -1;
     }
     s->rwstate = SSL_NOTHING;
@@ -642,7 +640,7 @@ int do_dtls1_write(SSL_CONNECTION *sc, uint8_t type, const unsigned char *buf,
         return 0;
 
     if (len > ssl_get_max_send_fragment(sc)) {
-        SSLfatal(sc, SSL_AD_INTERNAL_ERROR, SSL_R_EXCEEDS_MAX_FRAGMENT_SIZE);
+        SSLfatal_data(sc, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_LENGTH, "DTLS send fragment exceeds maximum fragment size");
         return 0;
     }
 

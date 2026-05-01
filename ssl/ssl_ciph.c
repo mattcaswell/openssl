@@ -988,7 +988,7 @@ static int ssl_cipher_process_rulestr(const char *rule_str,
                  * it is no command or separator nor
                  * alphanumeric, so we call this an error.
                  */
-                ERR_raise(ERR_LIB_SSL, SSL_R_INVALID_COMMAND);
+                ERR_raise(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT);
                 return 0;
             }
 
@@ -1145,13 +1145,13 @@ static int ssl_cipher_process_rulestr(const char *rule_str,
                 && CHECK_AND_SKIP_CASE_PREFIX(buf, "SECLEVEL=")) {
                 int level = *buf - '0';
                 if (level < 0 || level > 5) {
-                    ERR_raise(ERR_LIB_SSL, SSL_R_INVALID_COMMAND);
+                    ERR_raise(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT);
                 } else {
                     c->sec_level = level;
                     ok = 1;
                 }
             } else {
-                ERR_raise(ERR_LIB_SSL, SSL_R_INVALID_COMMAND);
+                ERR_raise(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT);
             }
             if (ok == 0)
                 retval = 0;
@@ -1206,7 +1206,7 @@ static int check_suiteb_cipher_list(const SSL_METHOD *meth, CERT *c,
     /* Check version: if TLS 1.2 ciphers allowed we can use Suite B */
 
     if (!(meth->ssl3_enc->enc_flags & SSL_ENC_FLAG_TLS1_2_CIPHERS)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_AT_LEAST_TLS_1_2_NEEDED_IN_SUITEB_MODE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_UNSUPPORTED);
         return 0;
     }
 
@@ -1270,7 +1270,7 @@ static __owur int set_ciphersuites(STACK_OF(SSL_CIPHER) **currciphers, const cha
     if (*str != '\0'
         && (CONF_parse_list(str, ':', 1, ciphersuite_cb, newciphers) <= 0
             || sk_SSL_CIPHER_num(newciphers) == 0)) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_NO_CIPHER_MATCH);
+        ERR_raise(ERR_LIB_SSL, ERR_R_NO_MATCH);
         sk_SSL_CIPHER_free(newciphers);
         return 0;
     }
@@ -1995,7 +1995,7 @@ int SSL_COMP_add_compression_method(int id, COMP_METHOD *cm)
      * 193 to 255:  reserved for private use
      */
     if (id < 193 || id > 255) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_COMPRESSION_ID_NOT_WITHIN_PRIVATE_RANGE);
+        ERR_raise(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT);
         return 1;
     }
 
@@ -2006,7 +2006,7 @@ int SSL_COMP_add_compression_method(int id, COMP_METHOD *cm)
     comp->id = id;
     if (sk_SSL_COMP_find(comp_methods, comp) >= 0) {
         OPENSSL_free(comp);
-        ERR_raise(ERR_LIB_SSL, SSL_R_DUPLICATE_COMPRESSION_ID);
+        ERR_raise(ERR_LIB_SSL, ERR_R_DUPLICATE);
         return 1;
     }
     if (!sk_SSL_COMP_push(comp_methods, comp)) {
@@ -2231,12 +2231,12 @@ int ssl_cipher_list_to_bytes(SSL_CONNECTION *s, STACK_OF(SSL_CIPHER) *sk,
 
     /* Set disabled masks for this session */
     if (!ssl_set_client_disabled(s)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_NO_PROTOCOLS_AVAILABLE);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_NO_MATCH, "failed to compute disabled cipher masks");
         return 0;
     }
 
     if (sk == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "no cipher list available");
         return 0;
     }
 
@@ -2266,7 +2266,7 @@ int ssl_cipher_list_to_bytes(SSL_CONNECTION *s, STACK_OF(SSL_CIPHER) *sk,
         uint16_t grease_cs = ossl_grease_value(s, OSSL_GREASE_CIPHER);
 
         if (!WPACKET_put_bytes_u16(pkt, grease_cs)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to write GREASE cipher suite");
             return 0;
         }
         totlen += 2;
@@ -2281,7 +2281,7 @@ int ssl_cipher_list_to_bytes(SSL_CONNECTION *s, STACK_OF(SSL_CIPHER) *sk,
             continue;
 
         if (!ssl->method->put_cipher_by_char(c, pkt, &len)) {
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to write cipher suite to handshake message");
             return 0;
         }
 
@@ -2303,7 +2303,7 @@ int ssl_cipher_list_to_bytes(SSL_CONNECTION *s, STACK_OF(SSL_CIPHER) *sk,
             ? "No ciphers enabled for max supported SSL/TLS version"
             : NULL;
 
-        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, SSL_R_NO_CIPHERS_AVAILABLE,
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_NO_MATCH,
             maxvertext);
         return 0;
     }
@@ -2314,7 +2314,7 @@ int ssl_cipher_list_to_bytes(SSL_CONNECTION *s, STACK_OF(SSL_CIPHER) *sk,
                 0, NULL, NULL, SSL3_CK_SCSV, 0, 0, 0, 0, 0, 0, 0, 0, 0
             };
             if (!ssl->method->put_cipher_by_char(&scsv, pkt, &len)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to write SCSV cipher");
                 return 0;
             }
         }
@@ -2323,7 +2323,7 @@ int ssl_cipher_list_to_bytes(SSL_CONNECTION *s, STACK_OF(SSL_CIPHER) *sk,
                 0, NULL, NULL, SSL3_CK_FALLBACK_SCSV, 0, 0, 0, 0, 0, 0, 0, 0, 0
             };
             if (!ssl->method->put_cipher_by_char(&scsv, pkt, &len)) {
-                SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+                SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "failed to write fallback SCSV cipher");
                 return 0;
             }
         }

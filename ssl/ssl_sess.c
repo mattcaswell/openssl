@@ -361,7 +361,7 @@ int ssl_generate_session_id(SSL_CONNECTION *s, SSL_SESSION *ss)
         ss->session_id_length = SSL3_SSL_SESSION_ID_LENGTH;
         break;
     default:
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_UNSUPPORTED_SSL_VERSION);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_UNSUPPORTED, "unsupported protocol version for new session");
         return 0;
     }
 
@@ -390,8 +390,7 @@ int ssl_generate_session_id(SSL_CONNECTION *s, SSL_SESSION *ss)
         return 0;
     if (!CRYPTO_THREAD_read_lock(s->session_ctx->lock)) {
         CRYPTO_THREAD_unlock(ssl->lock);
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR,
-            SSL_R_SESSION_ID_CONTEXT_UNINITIALIZED);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_NOT_INITIALIZED, "error");
         return 0;
     }
     if (s->generate_session_id)
@@ -405,8 +404,7 @@ int ssl_generate_session_id(SSL_CONNECTION *s, SSL_SESSION *ss)
     tmp = (int)ss->session_id_length;
     if (!cb(ssl, ss->session_id, &tmp)) {
         /* The callback failed */
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR,
-            SSL_R_SSL_SESSION_ID_CALLBACK_FAILED);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_CALLBACK_FAILED, "callback failed in ssl generate session id");
         return 0;
     }
     /*
@@ -415,15 +413,14 @@ int ssl_generate_session_id(SSL_CONNECTION *s, SSL_SESSION *ss)
      */
     if (tmp == 0 || tmp > ss->session_id_length) {
         /* The callback set an illegal length */
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR,
-            SSL_R_SSL_SESSION_ID_HAS_BAD_LENGTH);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INVALID_LENGTH, "invalid length in ssl generate session id");
         return 0;
     }
     ss->session_id_length = tmp;
     /* Finally, check for a conflict */
     if (SSL_has_matching_session_id(ssl, ss->session_id,
             (unsigned int)ss->session_id_length)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_SSL_SESSION_ID_CONFLICT);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_DUPLICATE, "generated session ID conflicts with existing session");
         return 0;
     }
 
@@ -437,7 +434,7 @@ int ssl_get_new_session(SSL_CONNECTION *s, int session)
     SSL_SESSION *ss = NULL;
 
     if ((ss = SSL_SESSION_new()) == NULL) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_SSL_LIB);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_SSL_LIB, "failed to allocate new SSL session object");
         return 0;
     }
 
@@ -469,7 +466,7 @@ int ssl_get_new_session(SSL_CONNECTION *s, int session)
     }
 
     if (s->sid_ctx_length > sizeof(ss->sid_ctx)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "session ID context exceeds storage size");
         SSL_SESSION_free(ss);
         return 0;
     }
@@ -613,7 +610,7 @@ int ssl_get_prev_session(SSL_CONNECTION *s, CLIENTHELLO_MSG *hello)
         case SSL_TICKET_FATAL_ERR_MALLOC:
         case SSL_TICKET_FATAL_ERR_OTHER:
             fatal = 1;
-            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR, "fatal error processing session ticket from client");
             goto err;
         case SSL_TICKET_NONE:
         case SSL_TICKET_EMPTY:
@@ -659,8 +656,7 @@ int ssl_get_prev_session(SSL_CONNECTION *s, CLIENTHELLO_MSG *hello)
          * noticing).
          */
 
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR,
-            SSL_R_SESSION_ID_CONTEXT_UNINITIALIZED);
+        SSLfatal_data(s, SSL_AD_INTERNAL_ERROR, ERR_R_NOT_INITIALIZED, "error");
         fatal = 1;
         goto err;
     }
@@ -678,7 +674,7 @@ int ssl_get_prev_session(SSL_CONNECTION *s, CLIENTHELLO_MSG *hello)
     if (ret->flags & SSL_SESS_FLAG_EXTMS) {
         /* If old session includes extms, but new does not: abort handshake */
         if (!(s->s3.flags & TLS1_FLAGS_RECEIVED_EXTMS)) {
-            SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_INCONSISTENT_EXTMS);
+            SSLfatal_data(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_CONFLICT, "extended master secret flag mismatch between sessions");
             fatal = 1;
             goto err;
         }
@@ -916,7 +912,7 @@ int SSL_SESSION_set1_id(SSL_SESSION *s, const unsigned char *sid,
     unsigned int sid_len)
 {
     if (sid_len > SSL_MAX_SSL_SESSION_ID_LENGTH) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_SSL_SESSION_ID_TOO_LONG);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
         return 0;
     }
     s->session_id_length = sid_len;
@@ -1104,7 +1100,7 @@ int SSL_SESSION_set1_id_context(SSL_SESSION *s, const unsigned char *sid_ctx,
     unsigned int sid_ctx_len)
 {
     if (sid_ctx_len > SSL_MAX_SID_CTX_LENGTH) {
-        ERR_raise(ERR_LIB_SSL, SSL_R_SSL_SESSION_ID_CONTEXT_TOO_LONG);
+        ERR_raise(ERR_LIB_SSL, ERR_R_INVALID_LENGTH);
         return 0;
     }
     s->sid_ctx_length = sid_ctx_len;
