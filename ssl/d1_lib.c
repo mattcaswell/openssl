@@ -336,6 +336,9 @@ int dtls1_clear(SSL *ssl)
         DTLS_RX *rx = s->d1->rx;
         SSL *listener = s->d1->listener;
         OSSL_TIME created_at = s->d1->created_at;
+        unsigned int req_blocking_mode = s->d1->req_blocking_mode;
+        unsigned int force_nonblocking = s->d1->force_nonblocking;
+        unsigned int being_driven = s->d1->being_driven;
 #endif
 
         mtu = s->d1->mtu;
@@ -361,6 +364,24 @@ int dtls1_clear(SSL *ssl)
 #ifndef OPENSSL_NO_DTLS
         s->d1->rx = rx;
         s->d1->listener = listener;
+        /*
+         * The blocking mode is a property of the connection as the application
+         * configured it, not of the handshake, so it survives a clear.
+         */
+        s->d1->req_blocking_mode = req_blocking_mode;
+        /*
+         * SSL_clear() can be called from inside the very SSL_accept() the
+         * listener is driving, so losing this would let the connection block
+         * there and stall the listener.
+         */
+        s->d1->force_nonblocking = force_nonblocking;
+        /*
+         * being_driven says the listener is driving this connection's
+         * handshake, and is what keeps a concurrent tick from collecting it a
+         * second time. Losing it would let two threads into the state machine
+         * for one connection.
+         */
+        s->d1->being_driven = being_driven;
         s->d1->created_at = created_at;
 #endif
 
@@ -2189,7 +2210,14 @@ static void drive_single_connection(SSL *ssl, DTLS_LISTENER *dl,
     if (dl->require_hrr_cookie || dl->require_hvr_cookie)
         sc->s3.flags |= TLS1_FLAGS_STATELESS;
 
+    /*
+     * We are inside the listener's own tick, so this must not block: nothing
+     * else can make progress while it does, including whatever it would be
+     * waiting for.
+     */
+    sc->d1->force_nonblocking = 1;
     ret = SSL_accept(ssl);
+    sc->d1->force_nonblocking = 0;
 
     /*
      * Always clear the stateless flag after SSL_accept() completes.
@@ -2433,6 +2461,15 @@ SSL *ossl_dtls_accept_connection(SSL *ssl, uint64_t flags)
     if (conn != NULL)
         goto end;
 
+    /*
+     * Wait only if the caller has not asked us not to and the listener is in
+     * blocking mode. Note that the check for a network BIO below is deliberately
+     * left ahead of this, so that asking to wait on a listener which has none
+     * remains an error rather than silently returning nothing.
+     */
+    if (!no_block && !ossl_dtls_blocking(ssl) && dl->net_rbio != NULL)
+        no_block = 1;
+
     if (no_block) {
         /*
          * Non-blocking: run one tick to drain any pending datagram, then
@@ -2457,19 +2494,13 @@ SSL *ossl_dtls_accept_connection(SSL *ssl, uint64_t flags)
     }
 
     /*
-     * Loop calling ossl_dtls_tick() until a verified connection arrives or
-     * a fatal error occurs.
+     * Blocking path: tick to make whatever progress is possible now, and if
+     * that did not produce a connection, wait for readiness before ticking
+     * again.
      *
-     * This blocking accept path requires net_rbio to be a blocking BIO. With
-     * a blocking BIO each tick sleeps inside BIO_recvmmsg() until a datagram
-     * is received, so the loop waits efficiently and does not spin.
-     *
-     * If net_rbio were non-blocking, BIO_recvmmsg() would return a transient
-     * (non-fatal) error when no datagram is ready; ossl_dtls_tick() would then
-     * return >= 0 with the incoming queue still empty and this loop would busy
-     * spin. Callers that want non-blocking behaviour must use
-     * SSL_ACCEPT_CONNECTION_NO_BLOCK (handled above) instead of a non-blocking
-     * BIO on this path.
+     * The wait is what stops this from being a busy loop. The network BIO is
+     * non-blocking, so a tick which finds no datagram returns immediately;
+     * without waiting in between, this loop would spin.
      */
     for (;;) {
         if (ossl_dtls_tick(dl) < 0) {
@@ -2482,6 +2513,16 @@ SSL *ossl_dtls_accept_connection(SSL *ssl, uint64_t flags)
         conn = sk_SSL_shift(dl->incoming_connections);
         ossl_crypto_mutex_unlock(dl->mutex);
         if (conn != NULL)
+            break;
+
+        /*
+         * Nothing yet, so wait for the listener to become ready before ticking
+         * again. What that amounts to is decided by the poll translation for a
+         * listener: the network socket becoming readable, or another thread
+         * signalling the notifier because it produced readiness on our behalf.
+         */
+        if (!ossl_dtls_block_until_ready(ssl, SSL_POLL_EVENT_IC,
+                ossl_time_infinite(), /*bound_by_event_timeout=*/1))
             break;
     }
 
@@ -2533,6 +2574,16 @@ void ossl_dtls_listener_set0_net_rbio(SSL *s, BIO *bio)
         return;
 
     dl = (DTLS_LISTENER *)s;
+
+    /*
+     * The listener demultiplexes one socket to many connections, so it can
+     * never afford to block inside a read: a read for one connection would
+     * stall every other, and the demux lock is held across it. Blocking
+     * behaviour is provided by waiting for readiness instead, so configure the
+     * BIO for non-blocking operation on the application's behalf, as QUIC does.
+     */
+    if (bio != NULL)
+        BIO_set_nbio(bio, 1); /* best effort autoconfig */
 
     ossl_crypto_mutex_lock(dl->mutex);
 
@@ -2600,6 +2651,10 @@ void ossl_dtls_listener_set0_net_wbio(SSL *s, BIO *bio)
         return;
 
     dl = (DTLS_LISTENER *)s;
+
+    /* See ossl_dtls_listener_set0_net_rbio() as to why. */
+    if (bio != NULL)
+        BIO_set_nbio(bio, 1); /* best effort autoconfig */
 
     old_wbio = dl->net_wbio;
 
@@ -2951,6 +3006,244 @@ int ossl_dtls_set_value_uint(SSL *s, uint32_t class_, uint32_t id, uint64_t valu
 
     ossl_crypto_mutex_unlock(dl->mutex);
     return ret;
+}
+
+/*
+ * Resolve the requested blocking mode of a DTLS listener, or of a connection
+ * created from one, following the inheritance chain.
+ *
+ * A connection set to INHERIT follows its listener; a listener set to INHERIT
+ * is blocking, there being nothing further to inherit from. Blocking is
+ * therefore the default unless the application asks otherwise.
+ *
+ * Returns 1 if blocking is wanted, which says nothing about whether it can be
+ * provided - see ossl_dtls_can_support_blocking().
+ */
+static int ossl_dtls_desires_blocking(const SSL *s)
+{
+    const SSL_CONNECTION *sc = SSL_CONNECTION_FROM_CONST_SSL_ONLY(s);
+    const DTLS_LISTENER *dl = NULL;
+
+    if (sc != NULL && sc->d1 != NULL) {
+        /* The listener is driving this connection; it must not block. */
+        if (sc->d1->force_nonblocking)
+            return 0;
+
+        if (sc->d1->req_blocking_mode != DTLS_BLOCKING_MODE_INHERIT)
+            return sc->d1->req_blocking_mode == DTLS_BLOCKING_MODE_BLOCKING;
+
+        dl = (const DTLS_LISTENER *)sc->d1->listener;
+    } else if (IS_DTLS_LISTENER(s)) {
+        dl = (const DTLS_LISTENER *)s;
+    }
+
+    if (dl == NULL)
+        return 0;
+
+    return dl->req_blocking_mode != DTLS_BLOCKING_MODE_NONBLOCKING;
+}
+
+/*
+ * Report whether blocking mode can be provided for a DTLS listener or a
+ * connection created from one.
+ *
+ * Blocking is emulated by waiting for readiness of the listener's network
+ * socket, so it requires a BIO which can supply a poll descriptor to wait on.
+ * A memory BIO cannot, and such a listener is therefore non-blocking whatever
+ * was requested, as is the case for QUIC.
+ */
+static int ossl_dtls_can_support_blocking(const SSL *s)
+{
+    const SSL_CONNECTION *sc = SSL_CONNECTION_FROM_CONST_SSL_ONLY(s);
+    const SSL *listener = NULL;
+    BIO_POLL_DESCRIPTOR desc;
+    BIO *rbio;
+
+    if (sc != NULL && sc->d1 != NULL)
+        listener = sc->d1->listener;
+    else if (IS_DTLS_LISTENER(s))
+        listener = s;
+
+    if (listener == NULL)
+        return 0;
+
+    rbio = SSL_get_rbio(listener);
+    if (rbio == NULL)
+        return 0;
+
+    return BIO_get_rpoll_descriptor(rbio, &desc) != 0
+        && desc.type == BIO_POLL_DESCRIPTOR_TYPE_SOCK_FD;
+}
+
+/*
+ * Report whether a call on this object should block, which is the case when
+ * blocking is both wanted and possible.
+ */
+int ossl_dtls_blocking(const SSL *s)
+{
+    return ossl_dtls_desires_blocking(s) && ossl_dtls_can_support_blocking(s);
+}
+
+int ossl_dtls_set_blocking_mode(SSL *s, int blocking)
+{
+    SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL_ONLY(s);
+    unsigned int mode = (blocking != 0)
+        ? DTLS_BLOCKING_MODE_BLOCKING
+        : DTLS_BLOCKING_MODE_NONBLOCKING;
+
+    /*
+     * Only a listener, or a connection created from one, has a blocking mode.
+     * Any other DTLS object takes its behaviour from its own BIO in the
+     * traditional way, so there is nothing here to configure.
+     */
+    if (!IS_DTLS_LISTENER(s)
+        && (sc == NULL || sc->d1 == NULL || sc->d1->listener == NULL)) {
+        ERR_raise(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT);
+        return 0;
+    }
+
+    /*
+     * Refuse to claim blocking we cannot deliver, as QUIC does. Checked before
+     * anything is written, so that a call which fails leaves the mode alone
+     * rather than reporting failure having already changed it.
+     */
+    if (blocking && !ossl_dtls_can_support_blocking(s)) {
+        ERR_raise(ERR_LIB_SSL, ERR_R_UNSUPPORTED);
+        return 0;
+    }
+
+    if (IS_DTLS_LISTENER(s))
+        ((DTLS_LISTENER *)s)->req_blocking_mode = mode;
+    else
+        sc->d1->req_blocking_mode = mode;
+
+    return 1;
+}
+
+int ossl_dtls_get_blocking_mode(const SSL *s)
+{
+    const SSL_CONNECTION *sc = SSL_CONNECTION_FROM_CONST_SSL_ONLY(s);
+
+    if (!IS_DTLS_LISTENER(s)
+        && (sc == NULL || sc->d1 == NULL || sc->d1->listener == NULL))
+        return -1;
+
+    return ossl_dtls_blocking(s);
+}
+
+/*
+ * Wait until a datagram has been demultiplexed to this connection's receive
+ * queue, for a connection which is in blocking mode.
+ *
+ * This is what makes a blocking read on a listener based connection block. Such
+ * a connection has no BIO of its own to block in: it reads from a queue which
+ * the listener fills, so the wait has to happen here instead.
+ *
+ * A wakeup does not mean the datagram was ours - the listener's socket is
+ * shared, and another connection may be the one with data - so this loops until
+ * something actually lands in our queue. Events are handled after each wait
+ * because nothing else will do it while we are in here, and the retransmission
+ * timer needs servicing if it is what woke us.
+ *
+ * A datagram which is already waiting costs nothing: the wait pumps the
+ * listener's demux while translating the poll, and returns without sleeping if
+ * anything has been queued for us by then.
+ *
+ * Returns 1 if a datagram is now queued for this connection, or 0 if the wait
+ * could not be performed or the listener has failed.
+ */
+int ossl_dtls_conn_wait_for_datagram(SSL *s)
+{
+    SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL_ONLY(s);
+    DTLS_LISTENER *dl;
+    int empty;
+
+    if (sc == NULL || sc->d1 == NULL || sc->d1->rx == NULL
+        || sc->d1->listener == NULL)
+        return 0;
+
+    dl = (DTLS_LISTENER *)sc->d1->listener;
+
+    for (;;) {
+        ossl_crypto_mutex_lock(dl->mutex);
+        if (dl->fatal) {
+            ossl_crypto_mutex_unlock(dl->mutex);
+            return 0;
+        }
+        ossl_crypto_mutex_unlock(dl->mutex);
+
+        /*
+         * An infinite deadline here is bounded by the connection's own event
+         * timeout, which the poll translation folds in, so this still wakes in
+         * time to retransmit.
+         */
+        if (!ossl_dtls_block_until_ready(s, SSL_POLL_EVENT_R,
+                ossl_time_infinite(), /*bound_by_event_timeout=*/1))
+            return 0;
+
+        if (!SSL_handle_events(s))
+            return 0;
+
+        ossl_dgram_demux_pump(sc->d1->rx->demux);
+
+        ossl_crypto_mutex_lock(sc->d1->rx->mutex);
+        empty = ossl_list_urxe_is_empty(&sc->d1->rx->urxe_pending);
+        ossl_crypto_mutex_unlock(sc->d1->rx->mutex);
+
+        if (!empty)
+            return 1;
+    }
+}
+
+/*
+ * Wait until the listener's socket can accept another datagram, for a
+ * connection which is in blocking mode.
+ *
+ * The socket is shared with every other connection and is always
+ * non-blocking, so a send which cannot be completed has nowhere to wait. For
+ * DTLS the record layer would otherwise discard the datagram - a reasonable
+ * default for an unreliable transport, but not what an application which asked
+ * for blocking writes expects.
+ *
+ * Only one wait is performed. The caller retries the send, and comes back here
+ * if it still cannot proceed, so a wakeup which turns out not to leave room in
+ * the socket buffer costs an extra attempt rather than a lost datagram.
+ *
+ * The retransmission timer deliberately does not shorten this wait, unlike the
+ * one for a datagram above. There the wakeup is useful, because the wait can
+ * service the timer itself; here it cannot. Servicing it would mean
+ * retransmitting a flight from inside tls_retry_write_records(), which is
+ * part-way through sending one and holds write buffer state that a
+ * re-entrant do_dtls1_write() would clobber. Waking for a timer nothing then
+ * services would be worse than not waking: the timeout stays expired, and an
+ * expired timeout reads as a zero deadline, so every later wait would return
+ * at once and the caller's retry loop would spin without sleeping. Waiting for
+ * the socket alone is also what the send actually needs. Retransmission is not
+ * the right response to a flight which has not finished going out, and once it
+ * has, the state machine handles the timer as usual.
+ *
+ * Returns 1 if the send should be retried, or 0 if the wait could not be
+ * performed or the listener has failed.
+ */
+int ossl_dtls_conn_wait_for_write(SSL *s)
+{
+    SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL_ONLY(s);
+    DTLS_LISTENER *dl;
+    int fatal;
+
+    if (sc == NULL || sc->d1 == NULL || sc->d1->listener == NULL)
+        return 0;
+
+    dl = (DTLS_LISTENER *)sc->d1->listener;
+
+    ossl_crypto_mutex_lock(dl->mutex);
+    fatal = dl->fatal;
+    ossl_crypto_mutex_unlock(dl->mutex);
+    if (fatal)
+        return 0;
+
+    return ossl_dtls_block_until_ready(s, SSL_POLL_EVENT_W,
+        ossl_time_infinite(), /*bound_by_event_timeout=*/0);
 }
 
 void ossl_dtls_listener_enter_blocking_section(SSL *s)

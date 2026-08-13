@@ -650,6 +650,9 @@ int ossl_ssl_connection_reset(SSL *s)
         DTLS_RX *saved_rx = NULL;
         SSL *saved_listener = NULL;
         OSSL_TIME saved_created_at = ossl_time_zero();
+        unsigned int saved_req_blocking_mode = DTLS_BLOCKING_MODE_INHERIT;
+        unsigned int saved_force_nonblocking = 0;
+        unsigned int saved_being_driven = 0;
         int is_dtls_listener_conn = 0;
 
         if (SSL_CONNECTION_IS_DTLS(sc) && sc->d1 != NULL
@@ -659,6 +662,9 @@ int ossl_ssl_connection_reset(SSL *s)
             saved_rx = sc->d1->rx;
             saved_listener = sc->d1->listener;
             saved_created_at = sc->d1->created_at;
+            saved_req_blocking_mode = sc->d1->req_blocking_mode;
+            saved_force_nonblocking = sc->d1->force_nonblocking;
+            saved_being_driven = sc->d1->being_driven;
             /*
              * Prevent dtls1_free from freeing rx and releasing the listener
              * reference - we'll restore them after ssl_init.
@@ -687,6 +693,19 @@ int ossl_ssl_connection_reset(SSL *s)
             sc->d1->rx = saved_rx;
             sc->d1->listener = saved_listener;
             sc->d1->created_at = saved_created_at;
+            /*
+             * The blocking mode is how the application configured this
+             * connection, not handshake state, so it survives a clear.
+             */
+            sc->d1->req_blocking_mode = saved_req_blocking_mode;
+            /*
+             * Both of these say something about the call this SSL_clear() may
+             * be nested inside: that the listener is driving the handshake and
+             * that it must not block while doing so. dtls1_clear() carries them
+             * over for the same reason.
+             */
+            sc->d1->force_nonblocking = saved_force_nonblocking;
+            sc->d1->being_driven = saved_being_driven;
         }
 #endif
     } else {
@@ -7971,25 +7990,31 @@ int SSL_net_write_desired(SSL *s)
 int SSL_set_blocking_mode(SSL *s, int blocking)
 {
 #ifndef OPENSSL_NO_QUIC
-    if (!IS_QUIC(s))
-        return 0;
-
-    return ossl_quic_conn_set_blocking_mode(s, blocking);
-#else
-    return 0;
+    if (IS_QUIC(s))
+        return ossl_quic_conn_set_blocking_mode(s, blocking);
 #endif
+
+#if !defined(OPENSSL_NO_DTLS) && !defined(OPENSSL_NO_SOCK)
+    if (IS_DTLS(s))
+        return ossl_dtls_set_blocking_mode(s, blocking);
+#endif
+
+    return 0;
 }
 
 int SSL_get_blocking_mode(SSL *s)
 {
 #ifndef OPENSSL_NO_QUIC
-    if (!IS_QUIC(s))
-        return -1;
-
-    return ossl_quic_conn_get_blocking_mode(s);
-#else
-    return -1;
+    if (IS_QUIC(s))
+        return ossl_quic_conn_get_blocking_mode(s);
 #endif
+
+#if !defined(OPENSSL_NO_DTLS) && !defined(OPENSSL_NO_SOCK)
+    if (IS_DTLS(s))
+        return ossl_dtls_get_blocking_mode(s);
+#endif
+
+    return -1;
 }
 
 int SSL_set1_initial_peer_addr(SSL *s, const BIO_ADDR *peer_addr)

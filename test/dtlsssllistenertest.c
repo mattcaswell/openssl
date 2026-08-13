@@ -28,6 +28,7 @@
 #include "internal/time.h"
 #include "internal/sockets.h"
 #include "internal/dgram_demux.h"
+#include "internal/ssl_unwrap.h"
 #include "helpers/ssltestlib.h"
 #include "testutil.h"
 #include "../ssl/ssl_local.h"
@@ -114,7 +115,7 @@ static int dtls_read_with_retry(SSL *ssl, void *buf, size_t bufsize,
  * Returns 1 on success, 0 on failure.
  * On success, caller is responsible for cleanup using the returned pointers/fds.
  */
-static int create_dtls_listener(SSL_CTX *sctx, uint64_t listener_flags,
+static int create_dtls_listener_unconfigured(SSL_CTX *sctx, uint64_t listener_flags,
     SSL **listener, BIO_ADDR **server_addr, int *server_fd)
 {
     BIO *listener_bio = NULL;
@@ -180,6 +181,38 @@ err:
         *server_fd = -1;
     }
     return ret;
+}
+
+/*
+ * As create_dtls_listener_unconfigured(), but also opts out of blocking mode.
+ *
+ * These tests drive both ends of a handshake from a single thread, so the server
+ * side must not block: a blocking read would wait for a client which only this
+ * thread can advance. A listener is blocking by default, so opt out here rather
+ * than in each test, and note that connections accepted from it inherit this.
+ *
+ * A test which needs to observe the default, or to exercise blocking mode, should
+ * use create_dtls_listener_unconfigured() and configure what it needs.
+ */
+static int create_dtls_listener(SSL_CTX *sctx, uint64_t listener_flags,
+    SSL **listener, BIO_ADDR **server_addr, int *server_fd)
+{
+    if (!create_dtls_listener_unconfigured(sctx, listener_flags, listener,
+            server_addr, server_fd))
+        return 0;
+
+    if (!TEST_true(SSL_set_blocking_mode(*listener, 0))) {
+        SSL_free(*listener);
+        BIO_ADDR_free(*server_addr);
+        if (*server_fd >= 0)
+            BIO_closesocket(*server_fd);
+        *listener = NULL;
+        *server_addr = NULL;
+        *server_fd = -1;
+        return 0;
+    }
+
+    return 1;
 }
 
 /*
@@ -740,9 +773,10 @@ err:
 }
 
 /*
- * Test SSL_accept_connection with no net_bio and NO_BLOCK flag.
- * When there is no BIO set and the caller requests non-blocking behaviour,
- * the function must return NULL immediately without raising an error.
+ * Test SSL_accept_connection with no net_bio and the
+ * SSL_ACCEPT_CONNECTION_NO_BLOCK flag, so that the caller is not asking to
+ * wait. The function must return NULL immediately without raising an error,
+ * the absence of a BIO being indistinguishable from having nothing queued.
  */
 static int test_dtls_accept_connection_no_bio_no_block(void)
 {
@@ -784,9 +818,10 @@ err:
 }
 
 /*
- * Test SSL_accept_connection with no net_bio and blocking mode (no NO_BLOCK).
- * When there is no BIO and the caller wants to block, the function must return
- * NULL and raise SSL_R_BIO_NOT_SET.
+ * Test SSL_accept_connection with no net_bio and without the
+ * SSL_ACCEPT_CONNECTION_NO_BLOCK flag, so that the caller is asking to wait.
+ * When there is no BIO the function must return NULL and raise
+ * SSL_R_BIO_NOT_SET rather than waiting, since nothing could ever arrive.
  */
 static int test_dtls_accept_connection_no_bio_block(void)
 {
@@ -5345,6 +5380,548 @@ end:
     return testresult;
 }
 
+/*
+ * Drive a client's ClientHello, and any cookie exchange, at the listener until
+ * a connection is sitting on its accept queue, without accepting it.
+ *
+ * Returns 1 on success, 0 on failure.
+ */
+static int drive_until_connection_queued(SSL *listener, SSL *clientssl)
+{
+    SSL_POLL_ITEM poll_item;
+    struct timeval poll_timeout;
+    size_t poll_result = 0;
+    int abortctr, retc, err_code;
+
+    poll_item.desc.type = BIO_POLL_DESCRIPTOR_TYPE_SSL;
+    poll_item.desc.value.ssl = listener;
+    poll_timeout.tv_sec = 0;
+    poll_timeout.tv_usec = 0;
+
+    SSL_set_connect_state(clientssl);
+
+    for (abortctr = 0; abortctr < 100; abortctr++) {
+        retc = SSL_connect(clientssl);
+        err_code = SSL_get_error(clientssl, retc);
+        if (retc <= 0
+            && err_code != SSL_ERROR_WANT_READ
+            && err_code != SSL_ERROR_WANT_WRITE) {
+            TEST_error("SSL_connect failed (err %d)", err_code);
+            return 0;
+        }
+
+        /* A zero timeout, so this ticks the listener without ever waiting. */
+        poll_item.events = SSL_POLL_EVENT_IC;
+        poll_item.revents = 0;
+
+        if (!TEST_true(SSL_poll(&poll_item, 1, sizeof(poll_item), &poll_timeout,
+                0, &poll_result)))
+            return 0;
+
+        if ((poll_item.revents & SSL_POLL_EVENT_IC) != 0)
+            return 1;
+    }
+
+    TEST_error("cookie exchange loop did not converge");
+    return 0;
+}
+
+/*
+ * Test the blocking mode of a DTLS listener and of the connections it creates.
+ *
+ * Blocking is the default, as it is for QUIC: a listener which was never
+ * configured is blocking, and a connection follows its listener unless it was
+ * given a setting of its own.
+ *
+ * Blocking is emulated by waiting for readiness of the listener's socket, so it
+ * needs a BIO which can supply a poll descriptor to wait on. Where there is
+ * none the object is non-blocking whatever was asked for, and asking for
+ * blocking fails rather than claiming something which cannot be delivered.
+ */
+static int test_dtls_blocking_mode(void)
+{
+    SSL_CTX *sctx = NULL, *cctx = NULL;
+    SSL *listener = NULL, *clientssl = NULL, *serverssl = NULL;
+    SSL *memlistener = NULL, *memclient = NULL, *plainssl = NULL;
+    BIO_ADDR *server_addr = NULL, *client_addr = NULL;
+    SSL_CONNECTION *sc;
+    int server_fd = -1, client_fd = -1;
+    int testresult = 0;
+
+    if (!TEST_true(create_ssl_ctx_pair(NULL, DTLS_server_method(),
+            DTLS_client_method(), DTLS1_VERSION, 0, &sctx, &cctx, cert,
+            privkey)))
+        goto end;
+
+    /*
+     * create_dtls_listener() turns blocking mode off on behalf of the single
+     * threaded tests, so it cannot be used here: this test has to see the mode
+     * a listener has when the application has never set it. Hence the
+     * unconfigured variant.
+     *
+     * A socket BIO supplies a poll descriptor, so blocking is available.
+     */
+    if (!TEST_true(create_dtls_listener_unconfigured(sctx,
+            SSL_LISTENER_FLAG_REQUIRE_HVR | SSL_LISTENER_FLAG_REQUIRE_HRR
+                | SSL_LISTENER_FLAG_SINGLE_THREAD,
+            &listener, &server_addr, &server_fd)))
+        goto end;
+
+    /* Blocking by default, having never been configured. */
+    if (!TEST_int_eq(SSL_get_blocking_mode(listener), 1))
+        goto end;
+
+    /* Get a connection object accepted from the listener to examine. */
+    if (!TEST_true(create_dtls_client_for_addr(cctx, server_addr, &clientssl,
+            &client_fd)))
+        goto end;
+
+    if (!drive_until_connection_queued(listener, clientssl)
+        || !TEST_ptr(serverssl = SSL_accept_connection(listener,
+                         SSL_ACCEPT_CONNECTION_NO_BLOCK)))
+        goto end;
+
+    /* It inherits the listener's mode. */
+
+    if (!TEST_int_eq(SSL_get_blocking_mode(serverssl), 1))
+        goto end;
+
+    /* Setting the listener non-blocking is inherited by the connection. */
+    if (!TEST_true(SSL_set_blocking_mode(listener, 0))
+        || !TEST_int_eq(SSL_get_blocking_mode(listener), 0)
+        || !TEST_int_eq(SSL_get_blocking_mode(serverssl), 0))
+        goto end;
+
+    /* A setting on the connection overrides what it would inherit. */
+    if (!TEST_true(SSL_set_blocking_mode(serverssl, 1))
+        || !TEST_int_eq(SSL_get_blocking_mode(serverssl), 1)
+        || !TEST_int_eq(SSL_get_blocking_mode(listener), 0))
+        goto end;
+
+    /*
+     * A connection's own setting survives SSL_clear(). The mode is a property
+     * of the connection as the application configured it, not of the handshake,
+     * and dtls1_clear() memsets d1 and restores only selected fields.
+     *
+     * The listener and the connection must disagree for this to prove anything:
+     * were the connection's setting lost it would fall back to inheriting, and
+     * that is only visible if the listener says something different.
+     */
+    if (!TEST_true(SSL_set_blocking_mode(listener, 1))
+        || !TEST_true(SSL_set_blocking_mode(serverssl, 0))
+        || !TEST_int_eq(SSL_get_blocking_mode(listener), 1)
+        || !TEST_int_eq(SSL_get_blocking_mode(serverssl), 0))
+        goto end;
+
+    /*
+     * being_driven has to survive a clear as well, for a different reason: it
+     * records that the listener is driving this connection's handshake, and is
+     * what stops a concurrent tick collecting the same connection a second
+     * time. The listener can reach SSL_clear() from inside the very
+     * SSL_accept() it is driving, so losing it there would admit a second
+     * thread to the state machine for this connection.
+     *
+     * It has to be set by hand, being held only for the duration of a call
+     * inside the listener's tick, which is not observable from out here.
+     */
+    if (!TEST_ptr(sc = SSL_CONNECTION_FROM_SSL_ONLY(serverssl)))
+        goto end;
+    sc->d1->being_driven = 1;
+
+    if (!TEST_true(SSL_clear(serverssl))
+        || !TEST_int_eq(SSL_get_blocking_mode(serverssl), 0)
+        || !TEST_ptr(sc = SSL_CONNECTION_FROM_SSL_ONLY(serverssl))
+        || !TEST_int_eq(sc->d1->being_driven, 1))
+        goto end;
+
+    /*
+     * Clear again. SSL_clear() resets the method to the default one, so the
+     * first call above went through the ssl_deinit/ssl_init path that
+     * reallocates d1 while this one goes through dtls1_clear(). Both discard
+     * d1, so both have to be covered.
+     */
+    if (!TEST_true(SSL_clear(serverssl))
+        || !TEST_int_eq(SSL_get_blocking_mode(serverssl), 0)
+        || !TEST_ptr(sc = SSL_CONNECTION_FROM_SSL_ONLY(serverssl))
+        || !TEST_int_eq(sc->d1->being_driven, 1))
+        goto end;
+
+    sc->d1->being_driven = 0;
+
+    /* And back the other way round. */
+    if (!TEST_true(SSL_set_blocking_mode(listener, 1))
+        || !TEST_true(SSL_set_blocking_mode(serverssl, 0))
+        || !TEST_int_eq(SSL_get_blocking_mode(listener), 1)
+        || !TEST_int_eq(SSL_get_blocking_mode(serverssl), 0))
+        goto end;
+
+    /*
+     * A listener on BIOs which cannot supply a poll descriptor reports
+     * non-blocking however it was configured, and asking for blocking fails.
+     */
+    if (!TEST_true(create_dtls_listener_and_client_mem(sctx, cctx,
+            SSL_LISTENER_FLAG_SINGLE_THREAD, &memlistener, &memclient,
+            &client_addr)))
+        goto end;
+
+    if (!TEST_int_eq(SSL_get_blocking_mode(memlistener), 0))
+        goto end;
+
+    ERR_clear_error();
+    if (!TEST_false(SSL_set_blocking_mode(memlistener, 1))
+        || !TEST_int_eq((int)ERR_GET_REASON(ERR_peek_error()), ERR_R_UNSUPPORTED))
+        goto end;
+    ERR_clear_error();
+
+    /* Asking for non-blocking is fine, that being what it already is. */
+    if (!TEST_true(SSL_set_blocking_mode(memlistener, 0))
+        || !TEST_int_eq(SSL_get_blocking_mode(memlistener), 0))
+        goto end;
+
+    /*
+     * A DTLS object which did not come from a listener has no blocking mode:
+     * it takes its behaviour from its own BIO in the traditional way.
+     */
+    if (!TEST_ptr(plainssl = SSL_new(cctx)))
+        goto end;
+
+    if (!TEST_int_eq(SSL_get_blocking_mode(plainssl), -1)
+        || !TEST_false(SSL_set_blocking_mode(plainssl, 1))
+        || !TEST_false(SSL_set_blocking_mode(plainssl, 0)))
+        goto end;
+
+    testresult = 1;
+end:
+    ERR_clear_error();
+    SSL_free(plainssl);
+    SSL_free(memclient);
+    SSL_free(memlistener);
+    SSL_free(serverssl);
+    SSL_free(clientssl);
+    SSL_free(listener);
+    BIO_ADDR_free(client_addr);
+    BIO_ADDR_free(server_addr);
+    if (server_fd >= 0)
+        BIO_closesocket(server_fd);
+    if (client_fd >= 0)
+        BIO_closesocket(client_fd);
+    SSL_CTX_free(sctx);
+    SSL_CTX_free(cctx);
+    return testresult;
+}
+
+/*
+ * Test when SSL_accept_connection() waits and when it does not.
+ *
+ * It waits only if the caller did not pass SSL_ACCEPT_CONNECTION_NO_BLOCK and
+ * the listener is in blocking mode, which is the same rule QUIC applies. So
+ * either of the two saying not to wait is enough, and this checks both of those
+ * cases: no client exists, so anything which did wait would never return.
+ */
+static int test_dtls_accept_wait_requires_mode_and_flag(void)
+{
+    SSL_CTX *sctx = NULL;
+    SSL *listener = NULL;
+    BIO_ADDR *server_addr = NULL;
+    int server_fd = -1;
+    int testresult = 0;
+
+    if (!TEST_ptr(sctx = SSL_CTX_new(DTLS_server_method())))
+        goto end;
+
+    if (!TEST_true(create_dtls_listener(sctx, SSL_LISTENER_FLAG_SINGLE_THREAD,
+            &listener, &server_addr, &server_fd)))
+        goto end;
+
+    /* Non-blocking mode, and no flag: the mode alone stops it waiting. */
+    if (!TEST_true(SSL_set_blocking_mode(listener, 0))
+        || !TEST_ptr_null(SSL_accept_connection(listener, 0)))
+        goto end;
+
+    /* Blocking mode, but the flag overrides it. */
+    if (!TEST_true(SSL_set_blocking_mode(listener, 1))
+        || !TEST_int_eq(SSL_get_blocking_mode(listener), 1)
+        || !TEST_ptr_null(SSL_accept_connection(listener,
+            SSL_ACCEPT_CONNECTION_NO_BLOCK)))
+        goto end;
+
+    testresult = 1;
+end:
+    SSL_free(listener);
+    BIO_ADDR_free(server_addr);
+    if (server_fd >= 0)
+        BIO_closesocket(server_fd);
+    SSL_CTX_free(sctx);
+    return testresult;
+}
+
+/*
+ * Test that a rejected SSL_set_blocking_mode() leaves the mode alone.
+ *
+ * Whether blocking can be supported depends on the listener's BIO, so a
+ * request can be refused now and be perfectly deliverable later. The refusal
+ * must therefore not record the mode it refused to set: the effect only becomes
+ * visible once a BIO which can supply a poll descriptor is in place, at which
+ * point the listener would be found blocking on the strength of a call which
+ * failed.
+ */
+static int test_dtls_blocking_mode_failed_set_is_inert(void)
+{
+    SSL_CTX *sctx = NULL;
+    SSL *listener = NULL;
+    BIO_ADDR *server_addr = NULL;
+    BIO *rbio = NULL;
+    int server_fd = -1;
+    int testresult = 0;
+
+    if (!TEST_ptr(sctx = SSL_CTX_new(DTLS_server_method())))
+        goto end;
+
+    if (!TEST_true(create_dtls_listener(sctx, SSL_LISTENER_FLAG_SINGLE_THREAD,
+            &listener, &server_addr, &server_fd)))
+        goto end;
+
+    /* Ask for non-blocking explicitly, so the default cannot mask a change. */
+    if (!TEST_true(SSL_set_blocking_mode(listener, 0))
+        || !TEST_int_eq(SSL_get_blocking_mode(listener), 0))
+        goto end;
+
+    /* Keep the BIO, then take it away so blocking cannot be supported. */
+    if (!TEST_ptr(rbio = SSL_get_rbio(listener))
+        || !TEST_true(BIO_up_ref(rbio)))
+        goto end;
+
+    SSL_set0_rbio(listener, NULL);
+
+    ERR_clear_error();
+    if (!TEST_false(SSL_set_blocking_mode(listener, 1))
+        || !TEST_int_eq((int)ERR_GET_REASON(ERR_peek_error()),
+            ERR_R_UNSUPPORTED)) {
+        BIO_free(rbio);
+        goto end;
+    }
+    ERR_clear_error();
+
+    /* Give the BIO back, which makes blocking supportable once more. */
+    SSL_set0_rbio(listener, rbio);
+
+    /* The refused request must not have taken effect. */
+    if (!TEST_int_eq(SSL_get_blocking_mode(listener), 0))
+        goto end;
+
+    testresult = 1;
+end:
+    SSL_free(listener);
+    BIO_ADDR_free(server_addr);
+    if (server_fd >= 0)
+        BIO_closesocket(server_fd);
+    SSL_CTX_free(sctx);
+    return testresult;
+}
+
+/*
+ * State for the filter BIO below.
+ */
+struct failing_send_data {
+    int fails_remaining; /* sends still to be rejected */
+    int sends; /* sends attempted through the filter */
+};
+
+static long failing_send_ctrl(BIO *bio, int cmd, long num, void *ptr)
+{
+    BIO *next = BIO_next(bio);
+
+    if (next == NULL)
+        return 0;
+
+    if (cmd == BIO_CTRL_DUP)
+        return 0L;
+
+    /*
+     * Everything else, the poll descriptors in particular, has to reach the
+     * socket underneath: the blocking write waits on the descriptor this
+     * returns.
+     */
+    return BIO_ctrl(next, cmd, num, ptr);
+}
+
+static int failing_send_sendmmsg(BIO *bio, BIO_MSG *msg, size_t stride,
+    size_t num_msg, uint64_t flags, size_t *msgs_processed)
+{
+    struct failing_send_data *data = BIO_get_data(bio);
+    BIO *next = BIO_next(bio);
+
+    if (data == NULL || next == NULL)
+        return 0;
+
+    data->sends++;
+
+    if (data->fails_remaining > 0) {
+        data->fails_remaining--;
+        *msgs_processed = 0;
+        /*
+         * BIO_err_is_non_fatal() accepts this, so the record layer treats the
+         * send as one to be attempted again rather than as an error.
+         */
+        ERR_raise(ERR_LIB_BIO, BIO_R_NON_FATAL);
+        return 0;
+    }
+
+    return BIO_sendmmsg(next, msg, stride, num_msg, flags, msgs_processed);
+}
+
+/* Choose a sufficiently large type likely to be unused for this custom BIO */
+#define BIO_TYPE_FAILING_SEND_FILTER (0x83 | BIO_TYPE_FILTER)
+
+static BIO_METHOD *method_failing_send = NULL;
+
+/* Note: Not thread safe! */
+static const BIO_METHOD *bio_f_failing_send_filter(void)
+{
+    if (method_failing_send == NULL) {
+        method_failing_send = BIO_meth_new(BIO_TYPE_FAILING_SEND_FILTER,
+            "Failing datagram send filter");
+        if (method_failing_send == NULL
+            || !BIO_meth_set_ctrl(method_failing_send, failing_send_ctrl)
+            || !BIO_meth_set_sendmmsg(method_failing_send,
+                failing_send_sendmmsg))
+            return NULL;
+    }
+    return method_failing_send;
+}
+
+/*
+ * Test that a write on a blocking listener connection waits for the socket and
+ * sends again, rather than reporting that it needs to be retried.
+ *
+ * A datagram which cannot be sent is normally dropped, which is reasonable for
+ * an unreliable transport but is not what an application asking for blocking
+ * writes expects: it gets no data sent and a WANT_WRITE it did not ask to have
+ * to handle. The listener's socket is shared and always non-blocking, so there
+ * is nothing for such a write to block in by itself.
+ *
+ * A loopback socket's send buffer does not fill, so a filter BIO supplies the
+ * transient failure instead. Only one send is rejected: the retry then goes
+ * through, and the client is read to confirm the datagram was really sent
+ * rather than merely reported as sent.
+ *
+ * The handshake runs with the listener non-blocking, so this test drives both
+ * ends from the one thread as the others here do, and only the connection is
+ * switched to blocking, for the write.
+ */
+static int test_dtls_blocking_write(void)
+{
+    SSL_CTX *sctx = NULL, *cctx = NULL;
+    SSL *listener = NULL, *clientssl = NULL, *serverssl = NULL;
+    BIO_ADDR *server_addr = NULL;
+    BIO *sockbio = NULL, *filter = NULL;
+    struct failing_send_data data;
+    int server_fd = -1, client_fd = -1;
+    int testresult = 0;
+    char buf[256];
+    size_t written = 0, readbytes = 0;
+    int i, ret = -1;
+
+    memset(&data, 0, sizeof(data));
+
+    if (!TEST_true(create_ssl_ctx_pair(NULL, DTLS_server_method(),
+            DTLS_client_method(), DTLS1_VERSION, 0, &sctx, &cctx, cert,
+            privkey)))
+        goto end;
+
+    if (!TEST_true(create_dtls_listener(sctx, SSL_LISTENER_FLAG_SINGLE_THREAD,
+            &listener, &server_addr, &server_fd)))
+        goto end;
+
+    /*
+     * Insert the filter in front of the listener's socket for writes only,
+     * leaving reads to reach the socket directly. The listener holds a
+     * reference for each direction, so the filter chain needs one of its own.
+     */
+    if (!TEST_ptr(sockbio = SSL_get_wbio(listener))
+        || !TEST_ptr(filter = BIO_new(bio_f_failing_send_filter())))
+        goto end;
+
+    BIO_set_data(filter, &data);
+    BIO_set_init(filter, 1);
+
+    if (!TEST_true(BIO_up_ref(sockbio))) {
+        BIO_free(filter);
+        goto end;
+    }
+
+    BIO_push(filter, sockbio);
+    SSL_set0_wbio(listener, filter); /* the listener owns the chain now */
+    filter = NULL;
+
+    if (!TEST_true(create_dtls_client_for_addr(cctx, server_addr, &clientssl,
+            &client_fd)))
+        goto end;
+
+    if (!drive_until_connection_queued(listener, clientssl)
+        || !TEST_ptr(serverssl = SSL_accept_connection(listener,
+                         SSL_ACCEPT_CONNECTION_NO_BLOCK)))
+        goto end;
+
+    if (!TEST_true(create_ssl_connection(serverssl, clientssl, SSL_ERROR_NONE)))
+        goto end;
+
+    /*
+     * Everything up to here, including any post-handshake traffic, has gone
+     * through the filter untouched. Reject the next send only.
+     */
+    if (!TEST_true(SSL_set_blocking_mode(serverssl, 1))
+        || !TEST_int_eq(SSL_get_blocking_mode(serverssl), 1))
+        goto end;
+
+    data.sends = 0;
+    data.fails_remaining = 1;
+
+    if (!TEST_true(SSL_write_ex(serverssl, "msg", 3, &written))
+        || !TEST_size_t_eq(written, 3))
+        goto end;
+
+    /*
+     * The send really was rejected, and was retried rather than reported: the
+     * count proves a second attempt was made, which is the whole behaviour
+     * under test. Without it, a write which never reached the filter at all
+     * would look the same as one which was retried.
+     */
+    if (!TEST_int_eq(data.fails_remaining, 0)
+        || !TEST_int_ge(data.sends, 2))
+        goto end;
+
+    /* The datagram reached the client, so nothing was dropped on the way. */
+    for (i = 0; i < 20; i++) {
+        ret = SSL_read_ex(clientssl, buf, sizeof(buf), &readbytes);
+        if (ret == 1)
+            break;
+        if (!TEST_int_eq(SSL_get_error(clientssl, ret), SSL_ERROR_WANT_READ))
+            goto end;
+        OSSL_sleep(10);
+    }
+
+    if (!TEST_int_eq(ret, 1)
+        || !TEST_mem_eq(buf, readbytes, "msg", 3))
+        goto end;
+
+    testresult = 1;
+end:
+    SSL_free(serverssl);
+    SSL_free(clientssl);
+    SSL_free(listener);
+    BIO_ADDR_free(server_addr);
+    if (server_fd >= 0)
+        BIO_closesocket(server_fd);
+    if (client_fd >= 0)
+        BIO_closesocket(client_fd);
+    SSL_CTX_free(sctx);
+    SSL_CTX_free(cctx);
+    BIO_meth_free(method_failing_send);
+    method_failing_send = NULL;
+    return testresult;
+}
+
 OPT_TEST_DECLARE_USAGE("certfile privkeyfile\n")
 
 int setup_tests(void)
@@ -5425,6 +6002,12 @@ int setup_tests(void)
     /* Pending timeout tests */
     ADD_TEST(test_dtls_listener_pending_timeout_basic);
     ADD_TEST(test_dtls_listener_pending_timeout_invalid);
+
+    /* Blocking mode tests */
+    ADD_TEST(test_dtls_blocking_mode);
+    ADD_TEST(test_dtls_blocking_mode_failed_set_is_inert);
+    ADD_TEST(test_dtls_accept_wait_requires_mode_and_flag);
+    ADD_TEST(test_dtls_blocking_write);
 
     /* SSL object ownership tests (run with ASAN to detect leaks/double-frees) */
     ADD_TEST(test_ssl_ownership_pending_conn_leak);
